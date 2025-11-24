@@ -12,7 +12,7 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 /**
  * Manages stream watchers for an event loop.
  */
-class StreamManager implements StreamManagerInterface
+final class StreamManager implements StreamManagerInterface
 {
     /**
      * Stores registered stream watchers, keyed by their unique string ID.

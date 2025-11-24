@@ -28,6 +28,30 @@ final class Loop
     }
 
     /**
+     * Register a listener to be notified when a signal has been caught.
+     *
+     * @param int $signal The signal number (e.g., SIGINT, SIGTERM)
+     * @param callable $callback Function to execute when signal is received
+     * @return string Unique identifier for this signal listener
+     * @throws \BadMethodCallException If signals are not supported
+     */
+    public static function addSignal(int $signal, callable $callback): string
+    {
+        return EventLoop::getInstance()->addSignal($signal, $callback);
+    }
+
+    /**
+     * Remove a signal listener.
+     *
+     * @param string $signalId The signal listener ID returned by addSignal()
+     * @return bool True if listener was removed, false if not found
+     */
+    public static function removeSignal(string $signalId): bool
+    {
+        return EventLoop::getInstance()->removeSignal($signalId);
+    }
+
+    /**
      * Schedule a timer to execute a callback after a specified delay.
      *
      * @param  float  $delay  Delay in seconds before executing the callback

@@ -7,6 +7,7 @@ namespace Hibla\EventLoop\Handlers;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\FileManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
+use Hibla\EventLoop\Managers\SignalManager;
 use Hibla\EventLoop\Managers\StreamManager;
 use Hibla\EventLoop\Managers\TimerManager;
 
@@ -18,58 +19,15 @@ use Hibla\EventLoop\Managers\TimerManager;
  */
 class WorkHandler
 {
-    /**
-     * @var TimerManager Manages scheduled timers.
-     */
-    protected TimerManager $timerManager;
-
-    /**
-     * @var HttpRequestManager Manages outgoing HTTP requests.
-     */
-    protected HttpRequestManager $httpRequestManager;
-
-    /**
-     * @var StreamManager Manages stream watchers and processing.
-     */
-    protected StreamManager $streamManager;
-
-    /**
-     * @var FiberManager Manages fiber scheduling and execution.
-     */
-    protected FiberManager $fiberManager;
-
-    /**
-     * @var TickHandler Manages next-tick and deferred callbacks.
-     */
-    protected TickHandler $tickHandler;
-
-    /**
-     * @var FileManager Manages file system operations.
-     */
-    protected FileManager $fileManager;
-
-    /**
-     * @param  TimerManager  $timerManager  Timer scheduling/processing.
-     * @param  HttpRequestManager  $httpRequestManager  HTTP request scheduling/processing.
-     * @param  StreamManager  $streamManager  Stream watching/processing.
-     * @param  FiberManager  $fiberManager  Fiber scheduling/processing.
-     * @param  TickHandler  $tickHandler  Next-tick and deferred callbacks.
-     * @param  FileManager  $fileManager  File system operations.
-     */
     public function __construct(
-        TimerManager $timerManager,
-        HttpRequestManager $httpRequestManager,
-        StreamManager $streamManager,
-        FiberManager $fiberManager,
-        TickHandler $tickHandler,
-        FileManager $fileManager,
+        protected TimerManager $timerManager,
+        protected HttpRequestManager $httpRequestManager,
+        protected StreamManager $streamManager,
+        protected FiberManager $fiberManager,
+        protected TickHandler $tickHandler,
+        protected FileManager $fileManager,
+        protected SignalManager $signalManager,
     ) {
-        $this->timerManager = $timerManager;
-        $this->httpRequestManager = $httpRequestManager;
-        $this->streamManager = $streamManager;
-        $this->fiberManager = $fiberManager;
-        $this->tickHandler = $tickHandler;
-        $this->fileManager = $fileManager;
     }
 
     /**
@@ -87,7 +45,8 @@ class WorkHandler
             || $this->httpRequestManager->hasRequests()
             || $this->fileManager->hasWork()
             || $this->streamManager->hasWatchers()
-            || $this->fiberManager->hasFibers();
+            || $this->fiberManager->hasFibers()
+            || $this->signalManager->hasSignals();
     }
 
     /**
@@ -102,6 +61,11 @@ class WorkHandler
     public function processWork(): bool
     {
         $workDone = false;
+
+        // 0) Signals
+        if ($this->signalManager->processSignals()) {
+            $workDone = true;
+        }
 
         // 1) Next-tick callbacks
         if ($this->tickHandler->processNextTickCallbacks()) {

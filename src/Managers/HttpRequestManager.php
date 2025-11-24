@@ -17,7 +17,7 @@ use Hibla\EventLoop\ValueObjects\HttpRequest;
  * This class handles queuing new requests, adding them to a cURL multi-handle for
  * concurrent processing, and processing their responses or cancellations.
  */
-class HttpRequestManager implements HttpRequestManagerInterface
+final class HttpRequestManager implements HttpRequestManagerInterface
 {
     /** @var list<HttpRequest> A queue of requests waiting to be added to the multi-handle. */
     private array $pendingRequests = [];

@@ -16,7 +16,7 @@ use Hibla\EventLoop\ValueObjects\Timer;
  * This class handles the creation, cancellation, and processing of timers,
  * determining when they are ready to be executed.
  */
-class TimerManager implements TimerManagerInterface
+final class TimerManager implements TimerManagerInterface
 {
     /**
      * A map of active timers, keyed by their unique string ID.

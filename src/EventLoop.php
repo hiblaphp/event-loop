@@ -14,6 +14,7 @@ use Hibla\EventLoop\Interfaces\EventLoopInterface;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\FileManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
+use Hibla\EventLoop\Managers\SignalManager;
 use Hibla\EventLoop\Managers\StreamManager;
 use Hibla\EventLoop\Managers\TimerManager;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
@@ -88,6 +89,11 @@ final class EventLoop implements EventLoopInterface
      */
     private FileManager $fileManager;
 
+    /**
+     * @var SignalManager Manages signal handling for the event loop
+     */
+    private SignalManager $signalManager;
+
     private int $iterationCount = 0;
     private float $lastOptimizationCheck = 0;
     private const OPTIMIZATION_INTERVAL = 1.0;
@@ -104,6 +110,7 @@ final class EventLoop implements EventLoopInterface
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
         $this->fileManager = new FileManager();
+        $this->signalManager = new SignalManager();
 
         $this->workHandler = new WorkHandler(
             timerManager: $this->timerManager,
@@ -112,6 +119,7 @@ final class EventLoop implements EventLoopInterface
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
             fileManager: $this->fileManager,
+            signalManager: $this->signalManager,
         );
 
         $this->sleepHandler = new SleepHandler(
@@ -170,6 +178,30 @@ final class EventLoop implements EventLoopInterface
         }
 
         return self::$instance;
+    }
+
+    /**
+     * Register a listener to be notified when a signal has been caught.
+     *
+     * @param int $signal The signal number (e.g., SIGINT, SIGTERM)
+     * @param callable $callback Function to execute when signal is received
+     * @return string Unique identifier for this signal listener
+     * @throws \BadMethodCallException If signals are not supported
+     */
+    public function addSignal(int $signal, callable $callback): string
+    {
+        return $this->signalManager->addSignal($signal, $callback);
+    }
+
+    /**
+     * Remove a signal listener.
+     *
+     * @param string $signalId The signal listener ID returned by addSignal()
+     * @return bool True if listener was removed, false if not found
+     */
+    public function removeSignal(string $signalId): bool
+    {
+        return $this->signalManager->removeSignal($signalId);
     }
 
     /**
@@ -361,10 +393,6 @@ final class EventLoop implements EventLoopInterface
      * Clear all pending work from all managers and handlers.
      * This is used during forced shutdown to ensure clean exit.
      */
-    /**
-     * Clear all pending work from all managers and handlers.
-     * This is used during forced shutdown to ensure clean exit.
-     */
     private function clearAllWork(): void
     {
         $this->tickHandler->clearAllCallbacks();
@@ -373,6 +401,7 @@ final class EventLoop implements EventLoopInterface
         $this->fileManager->clearAllOperations();
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
+        $this->signalManager->clearAllSignals();
     }
 
     /**

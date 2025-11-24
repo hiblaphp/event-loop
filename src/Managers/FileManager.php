@@ -16,7 +16,7 @@ use Hibla\EventLoop\ValueObjects\FileWatcher;
  * This class serves as the central point for queuing, canceling, and processing
  * all file-related tasks, including I/O operations and filesystem watching.
  */
-class FileManager implements FileManagerInterface
+final class FileManager implements FileManagerInterface
 {
     /** @var list<FileOperation> A queue of file operations waiting to be executed. */
     private array $pendingOperations = [];

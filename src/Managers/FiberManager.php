@@ -17,7 +17,7 @@ use Hibla\EventLoop\IOHandlers\Fiber\FiberStateHandler;
  * and managing the state of suspended fibers, ensuring they are resumed
  * when appropriate.
  */
-class FiberManager implements FiberManagerInterface
+final class FiberManager implements FiberManagerInterface
 {
     /** @var array<int, Fiber<mixed, mixed, mixed, mixed>> */
     private array $fibers = [];

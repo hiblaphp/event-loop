@@ -185,6 +185,38 @@ interface EventLoopInterface
     public function isIdle(): bool;
 
     /**
+     * Register a listener to be notified when a signal has been caught by this process.
+     *
+     * This is useful to catch user interrupt signals or shutdown signals from
+     * tools like supervisor or systemd.
+     *
+     * ```php
+     * $loop->addSignal(SIGINT, function (int $signal) {
+     *     echo "Caught user interrupt signal\n";
+     *     $loop->stop();
+     * });
+     * ```
+     *
+     * Signaling is only available on Unix-like platforms with the pcntl extension.
+     * Windows is not supported due to operating system limitations.
+     * This method will throw a BadMethodCallException if signals aren't supported.
+     *
+     * @param int $signal The signal number (e.g., SIGINT, SIGTERM, SIGHUP)
+     * @param callable(int): void $callback Function to execute when signal is received
+     * @return string Unique identifier for this signal listener
+     * @throws \BadMethodCallException If signals are not supported on this platform
+     */
+    public function addSignal(int $signal, callable $callback): string;
+
+    /**
+     * Remove a previously added signal listener.
+     *
+     * @param string $signalId The signal listener ID returned by addSignal()
+     * @return bool True if listener was removed, false if not found
+     */
+    public function removeSignal(string $signalId): bool;
+
+    /**
      * Get the singleton instance of the event loop.
      *
      * @return static The singleton event loop instance
