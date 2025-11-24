@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\EventLoop;
 
 use Fiber;
@@ -26,6 +28,16 @@ final class EventLoop implements EventLoopInterface
      * @var EventLoop|null Singleton instance of the event loop
      */
     private static ?EventLoop $instance = null;
+
+    /**
+     * Indicates if the auto-run feature has been registered.
+     */
+    private static bool $autoRunRegistered = false;
+
+    /**
+     * Indicates if the event loop has been explicitly stopped.
+     */
+    private static bool $explicitlyStopped = false;
 
     /**
      * @var TimerManager Manages timer-based delayed callbacks
@@ -82,6 +94,7 @@ final class EventLoop implements EventLoopInterface
     private float $lastOptimizationCheck = 0;
     private const OPTIMIZATION_INTERVAL = 1.0;
     private const MAX_ITERATIONS = 1000000;
+    private bool $hasStarted = false;
 
     private function __construct()
     {
@@ -109,6 +122,31 @@ final class EventLoop implements EventLoopInterface
             timerManager: $this->timerManager,
             fiberManager: $this->fiberManager
         );
+
+        $this->registerAutoRun();
+    }
+
+    /**
+     * Register shutdown function to auto-run the loop at script end.
+     */
+    private function registerAutoRun(): void
+    {
+        if (self::$autoRunRegistered) {
+            return;
+        }
+
+        self::$autoRunRegistered = true;
+
+        register_shutdown_function(function () {
+            $error = error_get_last();
+            if ((($error['type'] ?? 0) & (E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR)) !== 0) {
+                return;
+            }
+
+            if (! self::$explicitlyStopped && ! $this->hasStarted && $this->workHandler->hasWork()) {
+                $this->run();
+            }
+        });
     }
 
     /**
@@ -359,6 +397,7 @@ final class EventLoop implements EventLoopInterface
      */
     public function forceStop(): void
     {
+        self::$explicitlyStopped = true;
         $this->forceShutdown();
     }
 
@@ -418,6 +457,7 @@ final class EventLoop implements EventLoopInterface
      */
     public function stop(): void
     {
+        self::$explicitlyStopped = true;
         $this->stateHandler->stop();
     }
 
@@ -489,5 +529,7 @@ final class EventLoop implements EventLoopInterface
     public static function reset(): void
     {
         self::$instance = null;
+        self::$autoRunRegistered = false;
+        self::$explicitlyStopped = false;
     }
 }

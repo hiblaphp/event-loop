@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\EventLoop\Managers\FileManager;
 
 describe('FileManager', function () {

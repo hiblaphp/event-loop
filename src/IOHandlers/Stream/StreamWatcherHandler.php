@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\EventLoop\IOHandlers\Stream;
 
 use Hibla\EventLoop\ValueObjects\StreamWatcher;

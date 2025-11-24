@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Hibla\EventLoop\Handlers;
 
 use Hibla\EventLoop\Managers\FiberManager;

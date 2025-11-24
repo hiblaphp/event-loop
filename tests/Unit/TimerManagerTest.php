@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\EventLoop\Managers\TimerManager;
 
 describe('TimerManager', function () {

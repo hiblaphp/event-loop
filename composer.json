@@ -6,10 +6,7 @@
     "autoload": {
         "psr-4": {
             "Hibla\\EventLoop\\": "src/"
-        },
-        "files": [
-            "src/Boot/global-event-loop.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
@@ -23,9 +20,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "ext-curl": "*",
-        "rcalicdan/defer": "^1.0",
-        "vlucas/phpdotenv": "^5.6"
+        "ext-curl": "*"
     },
     "require-dev": {
         "pestphp/pest": "^3.0",
@@ -40,18 +35,10 @@
             "pestphp/pest-plugin": true
         }
     },
-    "suggest": {
-        "ext-uv": "More performant event loop using libuv instead of streams"
-    },
     "scripts": {
         "test": "./vendor/bin/pest",
         "format": "./vendor/bin/pint",
         "format-test": "./vendor/bin/pint --test",
-        "analyze": "./vendor/bin/phpstan analyse",
-        "qa": [
-            "@format-test",
-            "@analyze",
-            "@test"
-        ]
+        "analyze": "./vendor/bin/phpstan analyse"
     }
 }

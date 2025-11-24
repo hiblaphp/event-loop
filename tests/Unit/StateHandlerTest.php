@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\EventLoop\Handlers\StateHandler;
 
 describe('StateHandler', function () {
