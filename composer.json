@@ -25,7 +25,6 @@
     "require-dev": {
         "pestphp/pest": "^3.0",
         "revolt/event-loop": "^1.0",
-        "react/event-loop": "^1.5",
         "phpstan/phpstan": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "laravel/pint": "^1.25"
