@@ -190,9 +190,4 @@ interface EventLoopInterface
      * @return static The singleton event loop instance
      */
     public static function getInstance(): self;
-
-    /**
-     * Reset the singleton instance (primarily for testing).
-     */
-    public static function reset(): void;
 }

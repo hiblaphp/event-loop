@@ -59,11 +59,11 @@ final class StreamWatcher
      */
     public function __construct($stream, callable $callback, string $type = self::TYPE_READ)
     {
-        if (! is_resource($stream)) {
+        if (! \is_resource($stream)) {
             throw new \TypeError('Expected resource, got '.gettype($stream));
         }
 
-        if (! in_array($type, [self::TYPE_READ, self::TYPE_WRITE], true)) {
+        if (! \in_array($type, [self::TYPE_READ, self::TYPE_WRITE], true)) {
             throw new \InvalidArgumentException('Type must be either TYPE_READ or TYPE_WRITE');
         }
 
