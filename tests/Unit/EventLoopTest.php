@@ -55,11 +55,4 @@ describe('EventLoop Managers Access', function () {
 
         expect($timerManager)->toBeInstanceOf(Hibla\EventLoop\Managers\TimerManager::class);
     });
-
-    it('provides access to socket manager', function () {
-        $loop = EventLoop::getInstance();
-        $socketManager = $loop->getSocketManager();
-
-        expect($socketManager)->toBeInstanceOf(Hibla\EventLoop\Managers\SocketManager::class);
-    });
 });

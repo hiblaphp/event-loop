@@ -7,7 +7,6 @@ namespace Hibla\EventLoop\Handlers;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\FileManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
-use Hibla\EventLoop\Managers\SocketManager;
 use Hibla\EventLoop\Managers\StreamManager;
 use Hibla\EventLoop\Managers\TimerManager;
 
@@ -50,18 +49,12 @@ class WorkHandler
     protected FileManager $fileManager;
 
     /**
-     * @var SocketManager Manages socket watchers and processing.
-     */
-    protected SocketManager $socketManager;
-
-    /**
      * @param  TimerManager  $timerManager  Timer scheduling/processing.
      * @param  HttpRequestManager  $httpRequestManager  HTTP request scheduling/processing.
      * @param  StreamManager  $streamManager  Stream watching/processing.
      * @param  FiberManager  $fiberManager  Fiber scheduling/processing.
      * @param  TickHandler  $tickHandler  Next-tick and deferred callbacks.
      * @param  FileManager  $fileManager  File system operations.
-     * @param  SocketManager  $socketManager  Socket watching/processing.
      */
     public function __construct(
         TimerManager $timerManager,
@@ -70,7 +63,6 @@ class WorkHandler
         FiberManager $fiberManager,
         TickHandler $tickHandler,
         FileManager $fileManager,
-        SocketManager $socketManager,
     ) {
         $this->timerManager = $timerManager;
         $this->httpRequestManager = $httpRequestManager;
@@ -78,7 +70,6 @@ class WorkHandler
         $this->fiberManager = $fiberManager;
         $this->tickHandler = $tickHandler;
         $this->fileManager = $fileManager;
-        $this->socketManager = $socketManager;
     }
 
     /**
@@ -96,7 +87,6 @@ class WorkHandler
             || $this->httpRequestManager->hasRequests()
             || $this->fileManager->hasWork()
             || $this->streamManager->hasWatchers()
-            || $this->socketManager->hasWatchers()
             || $this->fiberManager->hasFibers();
     }
 
@@ -153,11 +143,6 @@ class WorkHandler
 
         // HTTP requests
         if ($this->httpRequestManager->processRequests()) {
-            $workDone = true;
-        }
-
-        // Socket I/O
-        if ($this->socketManager->processSockets()) {
             $workDone = true;
         }
 

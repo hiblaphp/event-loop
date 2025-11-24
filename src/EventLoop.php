@@ -14,7 +14,6 @@ use Hibla\EventLoop\Interfaces\EventLoopInterface;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\FileManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
-use Hibla\EventLoop\Managers\SocketManager;
 use Hibla\EventLoop\Managers\StreamManager;
 use Hibla\EventLoop\Managers\TimerManager;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
@@ -88,7 +87,6 @@ final class EventLoop implements EventLoopInterface
      * @var FileManager Manages file operations
      */
     private FileManager $fileManager;
-    private SocketManager $socketManager;
 
     private int $iterationCount = 0;
     private float $lastOptimizationCheck = 0;
@@ -106,7 +104,6 @@ final class EventLoop implements EventLoopInterface
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
         $this->fileManager = new FileManager();
-        $this->socketManager = new SocketManager();
 
         $this->workHandler = new WorkHandler(
             timerManager: $this->timerManager,
@@ -115,7 +112,6 @@ final class EventLoop implements EventLoopInterface
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
             fileManager: $this->fileManager,
-            socketManager: $this->socketManager,
         );
 
         $this->sleepHandler = new SleepHandler(
@@ -147,16 +143,6 @@ final class EventLoop implements EventLoopInterface
                 $this->run();
             }
         });
-    }
-
-    /**
-     * Get the socket manager.
-     *
-     * @return SocketManager The socket manager instance
-     */
-    public function getSocketManager(): SocketManager
-    {
-        return $this->socketManager;
     }
 
     /**
@@ -386,7 +372,6 @@ final class EventLoop implements EventLoopInterface
         $this->httpRequestManager->clearAllRequests();
         $this->fileManager->clearAllOperations();
         $this->streamManager->clearAllWatchers();
-        $this->socketManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
     }
 

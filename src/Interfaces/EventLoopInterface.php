@@ -199,20 +199,6 @@ interface EventLoopInterface
     public function getIterationCount(): int;
 
     /**
-     * Get the socket manager instance.
-     *
-     * @return object The socket manager instance
-     */
-    public function getSocketManager(): object;
-
-    /**
-     * Get the timer manager instance.
-     *
-     * @return object The timer manager instance
-     */
-    public function getTimerManager(): object;
-
-    /**
      * Get the singleton instance of the event loop.
      *
      * @return static The singleton event loop instance

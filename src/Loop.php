@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Hibla\EventLoop;
 
 use Fiber;
-use Hibla\EventLoop\Managers\SocketManager;
 use Hibla\EventLoop\Managers\TimerManager;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
@@ -276,16 +275,6 @@ final class Loop
     public static function getIterationCount(): int
     {
         return EventLoop::getInstance()->getIterationCount();
-    }
-
-    /**
-     * Get the socket manager.
-     *
-     * @return SocketManager The socket manager instance
-     */
-    public static function getSocketManager(): SocketManager
-    {
-        return EventLoop::getInstance()->getSocketManager();
     }
 
     /**
