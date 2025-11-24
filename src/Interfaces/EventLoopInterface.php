@@ -43,13 +43,6 @@ interface EventLoopInterface
     public function cancelTimer(string $timerId): bool;
 
     /**
-     * Check if the event loop has any active timers.
-     *
-     * @return bool True if there are active timers, false otherwise
-     */
-    public function hasTimers(): bool;
-
-    /**
      * Schedule an asynchronous HTTP request.
      *
      * @param  string  $url  The URL to request
@@ -190,13 +183,6 @@ interface EventLoopInterface
      * @return bool True if the loop is idle (no pending operations), false otherwise
      */
     public function isIdle(): bool;
-
-    /**
-     * Get current iteration count (useful for debugging/monitoring).
-     *
-     * @return int The number of loop iterations completed
-     */
-    public function getIterationCount(): int;
 
     /**
      * Get the singleton instance of the event loop.
