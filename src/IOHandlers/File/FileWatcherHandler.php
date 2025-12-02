@@ -6,17 +6,12 @@ namespace Hibla\EventLoop\IOHandlers\File;
 
 use Hibla\EventLoop\ValueObjects\FileWatcher;
 
-/**
- * Manages file watchers: creation, polling, and removal.
- */
 final readonly class FileWatcherHandler
 {
     /**
-     * Create a new FileWatcher.
-     *
-     * @param  string  $path  File or directory to watch.
-     * @param  callable  $callback  fn(string $event, string $path): void.
-     * @param  array<string,mixed>  $options  ['interval'=>int (ms), ...].
+     * @param  string  $path 
+     * @param  callable  $callback 
+     * @param  array<string,mixed>  $options 
      */
     public function createWatcher(
         string $path,
@@ -27,9 +22,7 @@ final readonly class FileWatcherHandler
     }
 
     /**
-     * Poll each watcher and invoke callbacks for those with changes.
-     *
-     * @param  list<FileWatcher>  $watchers  List of watchers to process (by reference).
+     * @param  list<FileWatcher>  $watchers 
      * @return bool True if any watcher detected changes.
      */
     public function processWatchers(array &$watchers): bool
@@ -46,11 +39,6 @@ final readonly class FileWatcherHandler
         return $processed;
     }
 
-    /**
-     * Check a single watcher for changes and execute its callback if needed.
-     *
-     * @return bool True if callback executed.
-     */
     private function checkWatcher(FileWatcher $watcher): bool
     {
         if (! $watcher->shouldCheck()) {
@@ -68,19 +56,13 @@ final readonly class FileWatcherHandler
     }
 
     /**
-     * Remove a watcher by its unique ID, preserving the list structure.
-     *
-     * This method uses array_filter and array_values to ensure that the array
-     * passed by reference remains a `list` (sequentially indexed), which
-     * satisfies strict static analysis rules.
-     *
      * @param  list<FileWatcher>  &$watchers  List of watchers (by reference).
      * @param  string  $watcherId  The ID to remove.
      * @return bool True if removal succeeded.
      */
     public function removeWatcher(array &$watchers, string $watcherId): bool
     {
-        $initialCount = count($watchers);
+        $initialCount = \count($watchers);
 
         $watchers = array_values(
             array_filter(
@@ -89,6 +71,6 @@ final readonly class FileWatcherHandler
             )
         );
 
-        return count($watchers) < $initialCount;
+        return \count($watchers) < $initialCount;
     }
 }

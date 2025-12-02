@@ -11,21 +11,21 @@ use Hibla\EventLoop\IOHandlers\Http\HttpRequestHandler;
 use Hibla\EventLoop\IOHandlers\Http\HttpResponseHandler;
 use Hibla\EventLoop\ValueObjects\HttpRequest;
 
-/**
- * Manages the entire lifecycle of HTTP requests for the event loop.
- *
- * This class handles queuing new requests, adding them to a cURL multi-handle for
- * concurrent processing, and processing their responses or cancellations.
- */
 final class HttpRequestManager implements HttpRequestManagerInterface
 {
-    /** @var list<HttpRequest> A queue of requests waiting to be added to the multi-handle. */
+    /**
+     *  @var list<HttpRequest>
+    */
     private array $pendingRequests = [];
 
-    /** @var array<int, HttpRequest> An associative array of active requests, keyed by their cURL handle ID. */
+    /**
+     * @var array<int, HttpRequest>
+    */
     private array $activeRequests = [];
 
-    /** @var array<string, HttpRequest> A map of requests by their unique object hash for cancellation. */
+    /**
+     * @var array<string, HttpRequest> 
+    */
     private array $requestsById = [];
 
     private readonly CurlMultiHandle $multiHandle;
@@ -42,12 +42,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     }
 
     /**
-     * Adds an HTTP request to the processing queue.
-     *
-     * @param  string  $url  The URL for the request.
-     * @param  array<int, mixed>  $options  cURL options for the request.
-     * @param  callable  $callback  The callback to execute upon completion.
-     * @return string A unique ID for the request, which can be used for cancellation.
+     * @param  string  $url 
+     * @param  array<int, mixed>  $options 
+     * @param  callable  $callback
      */
     public function addHttpRequest(string $url, array $options, callable $callback): string
     {
@@ -60,12 +57,6 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return $requestId;
     }
 
-    /**
-     * Cancels a pending or active HTTP request by its ID.
-     *
-     * @param  string  $requestId  The unique ID of the request to cancel.
-     * @return bool True if the request was found and canceled, false otherwise.
-     */
     public function cancelHttpRequest(string $requestId): bool
     {
         if (! isset($this->requestsById[$requestId])) {
@@ -96,11 +87,6 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return true;
     }
 
-    /**
-     * Processes all pending and active HTTP requests for one event loop tick.
-     *
-     * @return bool True if any work was done (request added or processed), false otherwise.
-     */
     public function processRequests(): bool
     {
         $workDone = false;
@@ -122,27 +108,18 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     public function getDebugInfo(): array
     {
         return [
-            'pending_count' => count($this->pendingRequests),
-            'active_count' => count($this->activeRequests),
-            'by_id_count' => count($this->requestsById),
+            'pending_count' => \count($this->pendingRequests),
+            'active_count' => \count($this->activeRequests),
+            'by_id_count' => \count($this->requestsById),
             'active_handles' => array_keys($this->activeRequests),
             'request_ids' => array_keys($this->requestsById),
         ];
     }
 
-    /**
-     * Clears all HTTP requests (both pending and active).
-     *
-     * This method cancels all pending requests and removes all active requests
-     * from the cURL multi-handle. All requests will have their callbacks invoked
-     * with a cancellation message.
-     *
-     * @return array{pending: int, active: int} The count of cleared requests by type.
-     */
     public function clearAllRequests(): array
     {
-        $pendingCount = count($this->pendingRequests);
-        $activeCount = count($this->activeRequests);
+        $pendingCount = \count($this->pendingRequests);
+        $activeCount = \count($this->activeRequests);
 
         $this->clearPendingRequests();
 
@@ -162,18 +139,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return ['pending' => $pendingCount, 'active' => $activeCount];
     }
 
-    /**
-     * Clears all pending HTTP requests without executing them.
-     *
-     * This method removes all queued requests that haven't been added to the
-     * cURL multi-handle yet. Active requests will continue processing normally.
-     * Cleared requests will have their callbacks invoked with a cancellation message.
-     *
-     * @return int The number of requests that were cleared.
-     */
     public function clearPendingRequests(): int
     {
-        $clearedCount = count($this->pendingRequests);
+        $clearedCount = \count($this->pendingRequests);
 
         if ($clearedCount === 0) {
             return 0;
@@ -191,14 +159,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return $clearedCount;
     }
 
-    /**
-     * Moves all pending requests into the active cURL multi-handle.
-     *
-     * @return bool True if at least one request was successfully added.
-     */
     private function addPendingRequests(): bool
     {
-        if (count($this->pendingRequests) === 0) {
+        if (\count($this->pendingRequests) === 0) {
             return false;
         }
 
@@ -211,14 +174,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return true;
     }
 
-    /**
-     * Executes the cURL multi-handle and processes any completed requests.
-     *
-     * @return bool True if at least one request completed during this tick.
-     */
     private function processActiveRequests(): bool
     {
-        if (count($this->activeRequests) === 0) {
+        if (\count($this->activeRequests) === 0) {
             return false;
         }
 
@@ -234,17 +192,12 @@ final class HttpRequestManager implements HttpRequestManagerInterface
             unset($this->requestsById[$requestId]);
         }
 
-        return count($completedRequests) > 0;
+        return \count($completedRequests) > 0;
     }
 
-    /**
-     * Checks if there are any pending or active HTTP requests.
-     *
-     * @return bool True if there are any requests in the system.
-     */
     public function hasRequests(): bool
     {
-        return count($this->pendingRequests) > 0 || count($this->activeRequests) > 0;
+        return \count($this->pendingRequests) > 0 || \count($this->activeRequests) > 0;
     }
 
     public function __destruct()

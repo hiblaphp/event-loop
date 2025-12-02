@@ -21,41 +21,21 @@ final class Signal
     ) {
     }
 
-    /**
-     * Get the signal number
-     *
-     * @return int The signal number
-     */
     public function getSignal(): int
     {
         return $this->signal;
     }
 
-    /**
-     * Get the callback function
-     *
-     * @return callable The callback function
-     */
     public function getCallback(): callable
     {
         return $this->callback;
     }
 
-    /**
-     * Get the unique identifier
-     *
-     * @return string The signal listener ID
-     */
     public function getId(): string
     {
         return $this->id;
     }
 
-    /**
-     * Invoke the signal callback
-     *
-     * @param int $signal The signal number that was received
-     */
     public function invoke(int $signal): void
     {
         ($this->callback)($signal);

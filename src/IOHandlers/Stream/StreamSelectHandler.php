@@ -9,21 +9,19 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 final readonly class StreamSelectHandler
 {
     /**
-     * Polls an array of stream watchers and returns the streams that are ready.
-     *
-     * @param  array<string, StreamWatcher>  $watchers  An associative array of StreamWatcher objects.
-     * @return array<resource> An array of stream resources that are ready for I/O.
+     * @param  array<string, StreamWatcher>  $watchers 
+     * @return array<resource>
      */
     public function selectStreams(array $watchers): array
     {
-        if (count($watchers) === 0) {
+        if (\count($watchers) === 0) {
             return [];
         }
 
         $read = $write = $except = [];
         foreach ($watchers as $watcher) {
             $stream = $watcher->getStream();
-            if (is_resource($stream)) {
+            if (\is_resource($stream)) {
                 if ($watcher->getType() === StreamWatcher::TYPE_READ) {
                     $read[] = $stream;
                 } elseif ($watcher->getType() === StreamWatcher::TYPE_WRITE) {
@@ -32,7 +30,7 @@ final readonly class StreamSelectHandler
             }
         }
 
-        if (count($read) === 0 && count($write) === 0) {
+        if (\count($read) === 0 && count($write) === 0) {
             return [];
         }
 
@@ -42,8 +40,6 @@ final readonly class StreamSelectHandler
     }
 
     /**
-     * Processes streams that are ready for I/O operations using an efficient lookup.
-     *
      * @param  array<resource>  $readyStreams  An array of stream resources that are ready.
      * @param  array<string, StreamWatcher>  &$watchers  The master map of active watchers, keyed by string ID.
      *                                                   This array is modified by reference.
@@ -53,7 +49,7 @@ final readonly class StreamSelectHandler
         $lookupMap = [];
         foreach ($watchers as $watcherId => $watcher) {
             $stream = $watcher->getStream();
-            if (is_resource($stream)) {
+            if (\is_resource($stream)) {
                 $lookupMap[(int) $stream] = $watcherId;
             }
         }

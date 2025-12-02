@@ -9,14 +9,9 @@ use Hibla\EventLoop\IOHandlers\Stream\StreamSelectHandler;
 use Hibla\EventLoop\IOHandlers\Stream\StreamWatcherHandler;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
-/**
- * Manages stream watchers for an event loop.
- */
 final class StreamManager implements StreamManagerInterface
 {
     /**
-     * Stores registered stream watchers, keyed by their unique string ID.
-     *
      * @var array<string, StreamWatcher>
      */
     private array $watchers = [];
@@ -31,12 +26,10 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * Adds a new stream watcher.
-     *
-     * @param  resource  $stream  The stream resource to watch.
-     * @param  callable  $callback  The callback to execute when the stream is ready.
-     * @param  string  $type  The type of watcher (read/write).
-     * @return string The unique ID of the created watcher.
+     * @param  resource  $stream 
+     * @param  callable  $callback  
+     * @param  string  $type  
+     * @return string 
      */
     public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
@@ -46,12 +39,6 @@ final class StreamManager implements StreamManagerInterface
         return $watcher->getId();
     }
 
-    /**
-     * Removes a stream watcher by its ID.
-     *
-     * @param  string  $watcherId  The ID of the watcher to remove.
-     * @return bool True if the watcher was removed, false if it didn't exist.
-     */
     public function removeStreamWatcher(string $watcherId): bool
     {
         if (isset($this->watchers[$watcherId])) {
@@ -63,36 +50,24 @@ final class StreamManager implements StreamManagerInterface
         return false;
     }
 
-    /**
-     * Processes streams that are ready for I/O.
-     */
     public function processStreams(): void
     {
-        if (count($this->watchers) === 0) {
+        if (\count($this->watchers) === 0) {
             return;
         }
 
         $readyStreams = $this->selectHandler->selectStreams($this->watchers);
 
-        if (count($readyStreams) > 0) {
+        if (\count($readyStreams) > 0) {
             $this->selectHandler->processReadyStreams($readyStreams, $this->watchers);
         }
     }
 
-    /**
-     * Checks if there are any registered watchers.
-     *
-     * @return bool True if there are watchers, false otherwise.
-     */
     public function hasWatchers(): bool
     {
-        return count($this->watchers) > 0;
+        return \count($this->watchers) > 0;
     }
 
-    /**
-     * Clear all stream watchers.
-     * Used during forced shutdown to prevent hanging.
-     */
     public function clearAllWatchers(): void
     {
         $this->watchers = [];

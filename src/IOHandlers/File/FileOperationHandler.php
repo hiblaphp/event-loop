@@ -54,9 +54,6 @@ final class FileOperationHandler
         return true;
     }
 
-    /**
-     * Notify that an operation has completed (success, error, or cancellation)
-     */
     private function completeOperation(FileOperation $operation): void
     {
         if ($this->onOperationComplete !== null) {
@@ -68,7 +65,7 @@ final class FileOperationHandler
     {
         $streamableOperations = ['read', 'write', 'copy'];
 
-        if (! in_array($operation->getType(), $streamableOperations, true)) {
+        if (! \in_array($operation->getType(), $streamableOperations, true)) {
             return false;
         }
 
@@ -95,7 +92,7 @@ final class FileOperationHandler
         }
 
         $createDirs = $options['create_directories'] ?? false;
-        if (is_scalar($createDirs) && (bool) $createDirs) {
+        if (\is_scalar($createDirs) && (bool) $createDirs) {
             $dir = dirname($path);
             if (! is_dir($dir)) {
                 if (! mkdir($dir, 0755, true)) {
@@ -366,10 +363,10 @@ final class FileOperationHandler
         $chunkSize = is_numeric($chunkSizeRaw) ? max(1, (int) $chunkSizeRaw) : self::CHUNK_SIZE;
 
         $trim = $options['trim'] ?? false;
-        $trim = is_scalar($trim) && (bool) $trim;
+        $trim = \is_scalar($trim) && (bool) $trim;
 
         $skipEmpty = $options['skip_empty'] ?? false;
-        $skipEmpty = is_scalar($skipEmpty) && (bool) $skipEmpty;
+        $skipEmpty = \is_scalar($skipEmpty) && (bool) $skipEmpty;
 
         $stream = @fopen($path, 'rb');
         if ($stream === false) {

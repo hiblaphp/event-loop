@@ -51,10 +51,11 @@ class WorkHandler
 
     /**
      * Process one full cycle of work:
-     * 1. Next-tick callbacks
-     * 2. Timers and fibers
-     * 3. I/O operations (HTTP, sockets, streams, files)
-     * 4. Deferred callbacks
+     * 1. Signal Handling
+     * 2. Next-tick callbacks
+     * 3. Timers and fibers
+     * 4. I/O operations (HTTP, sockets, streams, files)
+     * 5. Deferred callbacks
      *
      * @return bool True if any work was performed.
      */

@@ -7,16 +7,30 @@ namespace Hibla\EventLoop\ValueObjects;
 final class FileOperation
 {
     private string $id;
+
     private string $type;
+
     private string $path;
+
     private mixed $data;
-    /** @var callable */
+
+    /**
+     * @var callable
+     */
     private $callback;
-    /** @var array<string, mixed> */
+
+    /**
+     * @var array<string, mixed>
+     */
     private array $options;
+
     private float $createdAt;
+
     private bool $cancelled = false;
-    /** @var callable|null */
+    
+    /**
+     * @var callable|null
+     */
     private $scheduledCallback = null;
 
     /**

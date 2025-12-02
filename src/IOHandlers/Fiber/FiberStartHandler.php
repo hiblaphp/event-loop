@@ -4,21 +4,10 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\IOHandlers\Fiber;
 
-/**
- * Handles fiber startup operations.
- *
- * This class provides safe methods for starting new fibers
- * with proper error handling and state validation.
- */
 final readonly class FiberStartHandler
 {
     /**
-     * Safely start a new fiber.
-     *
-     * Attempts to start the given fiber if it hasn't been started yet.
-     * Handles any exceptions that may occur during startup.
-     *
-     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber to start
+     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber 
      * @return bool True if the fiber was successfully started
      */
     public function startFiber(\Fiber $fiber): bool
@@ -39,11 +28,7 @@ final readonly class FiberStartHandler
     }
 
     /**
-     * Check if a fiber can be started.
-     *
-     * A fiber can be started if it's not terminated and hasn't been started yet.
-     *
-     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber to check
+     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber 
      * @return bool True if the fiber can be started
      */
     public function canStart(\Fiber $fiber): bool

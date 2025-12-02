@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\ValueObjects;
 
-/**
- * Value object representing a periodic timer that executes repeatedly.
- */
 final class PeriodicTimer
 {
     private string $id;
+
     /**
      * @var callable
      */
     private $callback;
+
     private float $interval;
+
     private float $executeAt;
+
     private ?int $maxExecutions;
+    
     private int $executionCount = 0;
 
     public function __construct(float $interval, callable $callback, ?int $maxExecutions = null)
