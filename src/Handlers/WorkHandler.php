@@ -63,29 +63,26 @@ class WorkHandler
     {
         $workDone = false;
 
-        // 0) Signals
         if ($this->signalManager->processSignals()) {
             $workDone = true;
-        }
-
-        // 1) Next-tick callbacks
+        } 
+        
         if ($this->tickHandler->processNextTickCallbacks()) {
             $workDone = true;
         }
 
-        // 2) Timers and fibers
         $timerWork = $this->timerManager->processTimers();
         $fiberWork = $this->fiberManager->processFibers();
+
         if ($timerWork || $fiberWork) {
             $workDone = true;
         }
 
-        // 3) I/O operations
+
         if ($this->processIOOperations()) {
             $workDone = true;
         }
 
-        // 4) Deferred callbacks
         if ($this->tickHandler->processDeferredCallbacks()) {
             $workDone = true;
         }
@@ -96,7 +93,6 @@ class WorkHandler
     /**
      * Process all types of I/O in a single batch:
      * - HTTP requests
-     * - Sockets
      * - Streams (only if watchers exist)
      * - File operations
      *
@@ -106,18 +102,15 @@ class WorkHandler
     {
         $workDone = false;
 
-        // HTTP requests
         if ($this->httpRequestManager->processRequests()) {
             $workDone = true;
         }
 
-        // Stream I/O: process only when watchers exist
         if ($this->streamManager->hasWatchers()) {
             $this->streamManager->processStreams();
             $workDone = true;
         }
 
-        // File operations
         if ($this->fileManager->processFileOperations()) {
             $workDone = true;
         }
