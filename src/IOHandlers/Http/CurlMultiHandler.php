@@ -9,8 +9,8 @@ use RuntimeException;
 final readonly class CurlMultiHandler
 {
     /**
-     * @param  \CurlMultiHandle  $multiHandle 
-     * @return int 
+     * @param  \CurlMultiHandle  $multiHandle
+     * @return int
      */
     public function executeMultiHandle(\CurlMultiHandle $multiHandle): int
     {

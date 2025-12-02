@@ -7,7 +7,7 @@ namespace Hibla\EventLoop\IOHandlers\Fiber;
 final readonly class FiberStartHandler
 {
     /**
-     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber 
+     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber
      * @return bool True if the fiber was successfully started
      */
     public function startFiber(\Fiber $fiber): bool
@@ -28,7 +28,7 @@ final readonly class FiberStartHandler
     }
 
     /**
-     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber 
+     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber
      * @return bool True if the fiber can be started
      */
     public function canStart(\Fiber $fiber): bool

@@ -12,7 +12,7 @@ final class TickHandler
     private array $tickCallbacks = [];
 
     /**
-     * @var list<callable> 
+     * @var list<callable>
      */
     private array $deferredCallbacks = [];
 
@@ -56,9 +56,9 @@ final class TickHandler
     }
 
     /**
-     * @param  list<callable>  $callbacks 
-     * @param  string  $type  
-     * @return bool 
+     * @param  list<callable>  $callbacks
+     * @param  string  $type
+     * @return bool
      */
     private function processBatch(array &$callbacks, string $type): bool
     {

@@ -10,17 +10,9 @@ use Hibla\EventLoop\IOHandlers\Timer\TimerScheduleHandler;
 use Hibla\EventLoop\ValueObjects\PeriodicTimer;
 use Hibla\EventLoop\ValueObjects\Timer;
 
-/**
- * Manages the lifecycle of all timers for the event loop.
- *
- * This class handles the creation, cancellation, and processing of timers,
- * determining when they are ready to be executed.
- */
 final class TimerManager implements TimerManagerInterface
 {
     /**
-     * A map of active timers, keyed by their unique string ID.
-     *
      * @var array<string, Timer|PeriodicTimer>
      */
     private array $timers = [];
@@ -35,11 +27,9 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Adds a new timer to the manager.
-     *
-     * @param  float  $delay  The delay in seconds before the timer should fire.
-     * @param  callable  $callback  The callback to execute when the timer fires.
-     * @return string The unique ID of the created timer, which can be used for cancellation.
+     * @param  float  $delay
+     * @param  callable  $callback
+     * @return string The unique ID of the created timer.
      */
     public function addTimer(float $delay, callable $callback): string
     {
@@ -50,11 +40,9 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Adds a new periodic timer to the manager.
-     *
-     * @param  float  $interval  The interval in seconds between executions.
-     * @param  callable  $callback  The callback to execute on each interval.
-     * @param  int|null  $maxExecutions  Maximum executions (null for infinite).
+     * @param  float  $interval
+     * @param  callable  $callback
+     * @param  int|null  $maxExecutions
      * @return string The unique ID of the created periodic timer.
      */
     public function addPeriodicTimer(float $interval, callable $callback, ?int $maxExecutions = null): string
@@ -66,9 +54,7 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Cancels a pending timer by its unique ID.
-     *
-     * @param  string  $timerId  The ID of the timer to cancel.
+     * @param  string  $timerId
      * @return bool True if the timer was found and canceled, false otherwise.
      */
     public function cancelTimer(string $timerId): bool
@@ -83,8 +69,6 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Checks if a timer exists and is currently active.
-     *
      * @param  string  $timerId  The ID of the timer to check.
      * @return bool True if the timer exists.
      */
@@ -94,11 +78,6 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Processes all timers and executes any that are ready.
-     *
-     * This method should be called on each tick of the event loop. It delegates
-     * to the execution handler for regular timers, and handles periodic timers directly.
-     *
      * @return bool True if at least one timer was executed.
      */
     public function processTimers(): bool
@@ -112,20 +91,14 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Checks if there are any pending timers.
-     *
      * @return bool True if there is at least one active timer.
      */
     public function hasTimers(): bool
     {
-        return count($this->timers) > 0;
+        return \count($this->timers) > 0;
     }
 
     /**
-     * Calculates the time in seconds until the next timer is due to fire.
-     *
-     * This is used by the event loop to determine the optimal sleep duration.
-     *
      * @return float|null The delay until the next timer, or null if no timers are pending.
      */
     public function getNextTimerDelay(): ?float
@@ -140,18 +113,12 @@ final class TimerManager implements TimerManagerInterface
         return $this->scheduleHandler->calculateDelay($regularTimersTyped, $currentTime);
     }
 
-    /**
-     * Clear all pending timers.
-     * Used during forced shutdown to prevent hanging.
-     */
     public function clearAllTimers(): void
     {
         $this->timers = [];
     }
 
     /**
-     * Get statistics about timers (backward compatible addition).
-     *
      * @return array<string, mixed>
      */
     public function getTimerStats(): array
@@ -178,10 +145,8 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Get information about a specific timer (backward compatible addition).
-     *
-     * @param  string  $timerId  The timer ID to get info for
-     * @return array<string, mixed>|null Timer information or null if not found
+     * @param  string  $timerId
+     * @return array<string, mixed>|null
      */
     public function getTimerInfo(string $timerId): ?array
     {
@@ -210,10 +175,8 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Process regular (one-time) timers using the existing execution handler.
-     *
-     * @param  float  $currentTime  Current timestamp
-     * @return bool True if any regular timers were executed
+     * @param  float  $currentTime
+     * @return bool
      */
     private function processRegularTimers(float $currentTime): bool
     {
@@ -235,10 +198,8 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Process periodic timers and remove completed ones.
-     *
-     * @param  float  $currentTime  Current timestamp
-     * @return bool True if any periodic timers were executed
+     * @param  float  $currentTime
+     * @return bool
      */
     private function processPeriodicTimers(float $currentTime): bool
     {

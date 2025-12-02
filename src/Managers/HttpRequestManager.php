@@ -24,7 +24,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     private array $activeRequests = [];
 
     /**
-     * @var array<string, HttpRequest> 
+     * @var array<string, HttpRequest>
     */
     private array $requestsById = [];
 
@@ -42,8 +42,8 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     }
 
     /**
-     * @param  string  $url 
-     * @param  array<int, mixed>  $options 
+     * @param  string  $url
+     * @param  array<int, mixed>  $options
      * @param  callable  $callback
      */
     public function addHttpRequest(string $url, array $options, callable $callback): string

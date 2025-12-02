@@ -10,8 +10,8 @@ use Throwable;
 final readonly class TimerExecutionHandler
 {
     /**
-     * @param  array<string, Timer>  &$timers 
-     * @param  float  $currentTime 
+     * @param  array<string, Timer>  &$timers
+     * @param  float  $currentTime
      * @return bool True if at least one timer was executed, false otherwise.
      */
     public function executeReadyTimers(array &$timers, float $currentTime): bool
@@ -31,9 +31,9 @@ final readonly class TimerExecutionHandler
     }
 
     /**
-     * @param  array<string, Timer>  $timers  
-     * @param  float  $currentTime 
-     * @return array<string, Timer> 
+     * @param  array<string, Timer>  $timers
+     * @param  float  $currentTime
+     * @return array<string, Timer>
      */
     public function getReadyTimers(array $timers, float $currentTime): array
     {

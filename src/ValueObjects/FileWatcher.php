@@ -27,8 +27,8 @@ final class FileWatcher
     private float $lastChecked;
 
     /**
-     * @param  string  $path 
-     * @param  callable(string, string): void  $callback  
+     * @param  string  $path
+     * @param  callable(string, string): void  $callback
      * @param  array<string, mixed>  $options  Configuration options
      *                                         - polling_interval: float - Time between checks in seconds (default: 0.1)
      *                                         - watch_size: bool - Whether to watch file size changes (default: true)

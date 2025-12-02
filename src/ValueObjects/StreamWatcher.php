@@ -25,8 +25,8 @@ final class StreamWatcher
     private string $type;
 
     /**
-     * @param  resource  $stream 
-     * @param  callable(resource): void  $callback 
+     * @param  resource  $stream
+     * @param  callable(resource): void  $callback
      * @param  string  $type
      */
     public function __construct($stream, callable $callback, string $type = self::TYPE_READ)
@@ -51,7 +51,7 @@ final class StreamWatcher
     }
 
     /**
-     * @return resource 
+     * @return resource
      */
     public function getStream()
     {
@@ -64,7 +64,7 @@ final class StreamWatcher
     }
 
     /**
-     * @return callable(resource): void 
+     * @return callable(resource): void
      */
     public function getCallback(): callable
     {

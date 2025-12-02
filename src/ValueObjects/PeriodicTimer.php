@@ -18,7 +18,7 @@ final class PeriodicTimer
     private float $executeAt;
 
     private ?int $maxExecutions;
-    
+
     private int $executionCount = 0;
 
     public function __construct(float $interval, callable $callback, ?int $maxExecutions = null)

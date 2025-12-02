@@ -9,9 +9,9 @@ use Hibla\EventLoop\ValueObjects\FileWatcher;
 final readonly class FileWatcherHandler
 {
     /**
-     * @param  string  $path 
-     * @param  callable  $callback 
-     * @param  array<string,mixed>  $options 
+     * @param  string  $path
+     * @param  callable  $callback
+     * @param  array<string,mixed>  $options
      */
     public function createWatcher(
         string $path,
@@ -22,7 +22,7 @@ final readonly class FileWatcherHandler
     }
 
     /**
-     * @param  list<FileWatcher>  $watchers 
+     * @param  list<FileWatcher>  $watchers
      * @return bool True if any watcher detected changes.
      */
     public function processWatchers(array &$watchers): bool

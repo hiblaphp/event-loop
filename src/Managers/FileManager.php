@@ -12,22 +12,22 @@ use Hibla\EventLoop\ValueObjects\FileWatcher;
 
 final class FileManager implements FileManagerInterface
 {
-    /** 
-     * @var list<FileOperation> 
+    /**
+     * @var list<FileOperation>
      */
     private array $pendingOperations = [];
 
-    /** 
-     * @var array<string, FileOperation> 
+    /**
+     * @var array<string, FileOperation>
      */
     private array $operationsById = [];
 
-    /** 
+    /**
      * @var list<FileWatcher>
      */
     private array $watchers = [];
 
-    /** 
+    /**
      * @var array<string, FileWatcher>
      */
     private array $watchersById = [];
@@ -44,11 +44,11 @@ final class FileManager implements FileManagerInterface
     }
 
     /**
-     * @param  string  $type 
-     * @param  string  $path 
-     * @param  mixed  $data 
+     * @param  string  $type
+     * @param  string  $path
+     * @param  mixed  $data
      * @param  callable  $callback
-     * @param  array<string, mixed>  $options  
+     * @param  array<string, mixed>  $options
      * @return string The unique ID of the created operation.
      */
     public function addFileOperation(
@@ -92,9 +92,9 @@ final class FileManager implements FileManagerInterface
     }
 
     /**
-     * @param  string  $path  
-     * @param  callable  $callback 
-     * @param  array<string, mixed>  $options  
+     * @param  string  $path
+     * @param  callable  $callback
+     * @param  array<string, mixed>  $options
      * @return string
      */
     public function addFileWatcher(string $path, callable $callback, array $options = []): string

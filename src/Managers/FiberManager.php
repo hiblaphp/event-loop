@@ -10,16 +10,15 @@ use Hibla\EventLoop\IOHandlers\Fiber\FiberResumeHandler;
 use Hibla\EventLoop\IOHandlers\Fiber\FiberStartHandler;
 use Hibla\EventLoop\IOHandlers\Fiber\FiberStateHandler;
 
-
 final class FiberManager implements FiberManagerInterface
 {
-    /** 
-     * @var array<int, Fiber<mixed, mixed, mixed, mixed>> 
+    /**
+     * @var array<int, Fiber<mixed, mixed, mixed, mixed>>
     */
     private array $fibers = [];
 
-    /** 
-     * @var array<int, Fiber<mixed, mixed, mixed, mixed>> 
+    /**
+     * @var array<int, Fiber<mixed, mixed, mixed, mixed>>
     */
     private array $suspendedFibers = [];
 

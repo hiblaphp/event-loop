@@ -9,8 +9,8 @@ use Hibla\EventLoop\ValueObjects\Timer;
 final readonly class TimerScheduleHandler
 {
     /**
-     * @param  float  $delay 
-     * @param  callable  $callback  
+     * @param  float  $delay
+     * @param  callable  $callback
      * @return Timer
      */
     public function createTimer(float $delay, callable $callback): Timer
@@ -19,8 +19,8 @@ final readonly class TimerScheduleHandler
     }
 
     /**
-     * @param  Timer[]  $timers  
-     * @return float|null 
+     * @param  Timer[]  $timers
+     * @return float|null
      */
     public function getNextExecutionTime(array $timers): ?float
     {
@@ -38,9 +38,9 @@ final readonly class TimerScheduleHandler
     }
 
     /**
-     * @param  Timer[]  $timers  
-     * @param  float  $currentTime  
-     * @return float|null 
+     * @param  Timer[]  $timers
+     * @param  float  $currentTime
+     * @return float|null
      */
     public function calculateDelay(array $timers, float $currentTime): ?float
     {

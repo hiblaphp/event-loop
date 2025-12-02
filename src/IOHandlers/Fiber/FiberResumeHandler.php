@@ -7,7 +7,7 @@ namespace Hibla\EventLoop\IOHandlers\Fiber;
 final readonly class FiberResumeHandler
 {
     /**
-     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber 
+     * @param  \Fiber<mixed, mixed, mixed, mixed>  $fiber
      * @return bool True if the fiber was successfully resumed
      */
     public function resumeFiber(\Fiber $fiber): bool

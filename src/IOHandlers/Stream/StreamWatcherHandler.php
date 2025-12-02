@@ -9,9 +9,9 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 final readonly class StreamWatcherHandler
 {
     /**
-     * @param  resource  $stream  
-     * @param  callable  $callback  
-     * @return StreamWatcher 
+     * @param  resource  $stream
+     * @param  callable  $callback
+     * @return StreamWatcher
      */
     public function createWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): StreamWatcher
     {

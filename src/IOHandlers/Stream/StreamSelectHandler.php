@@ -9,7 +9,7 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 final readonly class StreamSelectHandler
 {
     /**
-     * @param  array<string, StreamWatcher>  $watchers 
+     * @param  array<string, StreamWatcher>  $watchers
      * @return array<resource>
      */
     public function selectStreams(array $watchers): array

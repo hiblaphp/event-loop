@@ -27,7 +27,7 @@ final class FileOperation
     private float $createdAt;
 
     private bool $cancelled = false;
-    
+
     /**
      * @var callable|null
      */

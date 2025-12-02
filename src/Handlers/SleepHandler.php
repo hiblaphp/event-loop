@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Handlers;
 
-use Hibla\EventLoop\Managers\FiberManager;
-use Hibla\EventLoop\Managers\TimerManager;
+use Hibla\EventLoop\Interfaces\FiberManagerInterface;
+use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
+use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 
-class SleepHandler
+final class SleepHandler implements SleepHandlerInterface
 {
     protected const int MIN_SLEEP_THRESHOLD = 50;
 
     protected const int MAX_SLEEP_DURATION = 500;
 
-    public function __construct(protected TimerManager $timerManager, protected FiberManager $fiberManager)
-    {}
+    public function __construct(protected TimerManagerInterface $timerManager, protected FiberManagerInterface $fiberManager)
+    {
+    }
 
     public function shouldSleep(bool $hasImmediateWork): bool
     {

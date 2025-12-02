@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Hibla\EventLoop;
 
 use Fiber;
-use Hibla\EventLoop\Managers\TimerManager;
+use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 /**
@@ -304,9 +304,9 @@ final class Loop
     /**
      * Get the timer manager.
      *
-     * @return TimerManager The timer manager instance
+     * @return TimerManagerInterface The timer manager instance
      */
-    public static function getTimerManager(): TimerManager
+    public static function getTimerManager(): TimerManagerInterface
     {
         return EventLoop::getInstance()->getTimerManager();
     }

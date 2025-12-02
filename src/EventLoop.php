@@ -5,114 +5,73 @@ declare(strict_types=1);
 namespace Hibla\EventLoop;
 
 use Fiber;
+use Hibla\EventLoop\Factories\EventLoopComponentFactory;
 use Hibla\EventLoop\Handlers\ActivityHandler;
-use Hibla\EventLoop\Handlers\SleepHandler;
 use Hibla\EventLoop\Handlers\StateHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
-use Hibla\EventLoop\Handlers\WorkHandler;
-use Hibla\EventLoop\Interfaces\EventLoopInterface;
+use Hibla\EventLoop\Interfaces\FiberManagerInterface;
+use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
+use Hibla\EventLoop\Interfaces\SignalManagerInterface;
+use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
+use Hibla\EventLoop\Interfaces\StreamManagerInterface;
+use Hibla\EventLoop\Interfaces\TimerManagerInterface;
+use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 use Hibla\EventLoop\Managers\FiberManager;
-use Hibla\EventLoop\Managers\FileManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
 use Hibla\EventLoop\Managers\SignalManager;
-use Hibla\EventLoop\Managers\StreamManager;
-use Hibla\EventLoop\Managers\TimerManager;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
-/**
- * Main event loop implementation for asynchronous operations using PHP Fibers.
- */
-final class EventLoop implements EventLoopInterface
+final class EventLoop
 {
-    /**
-     * @var EventLoop|null Singleton instance of the event loop
-     */
     private static ?EventLoop $instance = null;
 
-    /**
-     * Indicates if the auto-run feature has been registered.
-     */
     private static bool $autoRunRegistered = false;
 
-    /**
-     * Indicates if the event loop has been explicitly stopped.
-     */
     private static bool $explicitlyStopped = false;
 
-    /**
-     * @var TimerManager Manages timer-based delayed callbacks
-     */
-    private TimerManager $timerManager;
+    private TimerManagerInterface $timerManager;
 
-    /**
-     * @var HttpRequestManager Manages asynchronous HTTP requests
-     */
-    private HttpRequestManager $httpRequestManager;
+    private HttpRequestManagerInterface $httpRequestManager;
 
-    /**
-     * @var StreamManager Manages stream I/O operations
-     */
-    private StreamManager $streamManager;
+    private StreamManagerInterface $streamManager;
 
-    /**
-     * @var FiberManager Manages PHP Fiber execution and lifecycle
-     */
-    private FiberManager $fiberManager;
+    private FiberManagerInterface $fiberManager;
 
-    /**
-     * @var TickHandler Handles next-tick and deferred callback processing
-     */
     private TickHandler $tickHandler;
 
-    /**
-     * @var WorkHandler Coordinates work processing across all components
-     */
-    private WorkHandler $workHandler;
+    private WorkHandlerInterface $workHandler;
 
-    /**
-     * @var SleepHandler Manages sleep optimization for the event loop
-     */
-    private SleepHandler $sleepHandler;
+    private SleepHandlerInterface $sleepHandler;
 
-    /**
-     * @var ActivityHandler Tracks event loop activity for idle detection
-     */
     private ActivityHandler $activityHandler;
 
-    /**
-     * @var StateHandler Manages the running state of the event loop
-     */
     private StateHandler $stateHandler;
 
-    /**
-     * @var FileManager Manages file operations
-     */
-    private FileManager $fileManager;
+    private FileManagerInterface $fileManager;
 
-    /**
-     * @var SignalManager Manages signal handling for the event loop
-     */
-    private SignalManager $signalManager;
+    private SignalManagerInterface $signalManager;
 
     private int $iterationCount = 0;
     private float $lastOptimizationCheck = 0;
-    private const OPTIMIZATION_INTERVAL = 1.0;
-    private const MAX_ITERATIONS = 1000000;
+    private const float OPTIMIZATION_INTERVAL = 1.0;
+    private const int MAX_ITERATIONS = 1000000;
     private bool $hasStarted = false;
 
     private function __construct()
     {
-        $this->timerManager = new TimerManager();
+        $this->timerManager = EventLoopComponentFactory::createTimerManager();
+        $this->fileManager = EventLoopComponentFactory::createFileManager();
+        $this->streamManager = EventLoopComponentFactory::createStreamManager();
+        $this->fileManager = EventLoopComponentFactory::createFileManager();
         $this->httpRequestManager = new HttpRequestManager();
-        $this->streamManager = new StreamManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
-        $this->fileManager = new FileManager();
         $this->signalManager = new SignalManager();
 
-        $this->workHandler = new WorkHandler(
+        $this->workHandler = EventLoopComponentFactory::createWorkHandler(
             timerManager: $this->timerManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
@@ -122,7 +81,7 @@ final class EventLoop implements EventLoopInterface
             signalManager: $this->signalManager,
         );
 
-        $this->sleepHandler = new SleepHandler(
+        $this->sleepHandler = EventLoopComponentFactory::createSleepHandler(
             timerManager: $this->timerManager,
             fiberManager: $this->fiberManager
         );
@@ -156,9 +115,9 @@ final class EventLoop implements EventLoopInterface
     /**
      * Get the timer manager.
      *
-     * @return TimerManager The timer manager instance
+     * @return TimerManagerInterface The timer manager instance
      */
-    public function getTimerManager(): TimerManager
+    public function getTimerManager(): TimerManagerInterface
     {
         return $this->timerManager;
     }

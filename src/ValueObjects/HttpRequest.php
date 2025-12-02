@@ -18,7 +18,7 @@ final class HttpRequest
     private ?string $id = null;
 
     /**
-     * @param  string  $url 
+     * @param  string  $url
      * @param  array<int|string, mixed>  $options  cURL options array
      * @param  callable(?string, ?string, ?int, array<string, mixed>, ?string): void  $callback  Callback to execute on completion
      */
@@ -31,7 +31,7 @@ final class HttpRequest
 
     /**
      * @param  array<int|string, mixed>  $options
-     * @return \CurlHandle 
+     * @return \CurlHandle
      */
     private function createCurlHandle(array $options): \CurlHandle
     {
@@ -47,7 +47,7 @@ final class HttpRequest
     }
 
     /**
-     * @return callable(?string, ?string, ?int, array<string, mixed>, ?string): void 
+     * @return callable(?string, ?string, ?int, array<string, mixed>, ?string): void
      */
     public function getCallback(): callable
     {
@@ -60,10 +60,10 @@ final class HttpRequest
     }
 
     /**
-     * @param  string|null  $error 
-     * @param  string|null  $response 
-     * @param  int|null  $httpCode 
-     * @param  array<string, mixed>  $headers  
+     * @param  string|null  $error
+     * @param  string|null  $response
+     * @param  int|null  $httpCode
+     * @param  array<string, mixed>  $headers
      * @param  string|null  $httpVersion
      *
      * @throws \Throwable Any exception thrown by the callback is propagated

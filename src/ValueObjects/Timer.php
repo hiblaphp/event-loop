@@ -9,7 +9,7 @@ final class Timer
     private string $id;
 
     /**
-     * @var callable 
+     * @var callable
      */
     private $callback;
 

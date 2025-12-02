@@ -26,10 +26,10 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * @param  resource  $stream 
-     * @param  callable  $callback  
-     * @param  string  $type  
-     * @return string 
+     * @param  resource  $stream
+     * @param  callable  $callback
+     * @param  string  $type
+     * @return string
      */
     public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {

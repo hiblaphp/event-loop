@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Handlers;
 
-use Hibla\EventLoop\Managers\FiberManager;
-use Hibla\EventLoop\Managers\FileManager;
-use Hibla\EventLoop\Managers\HttpRequestManager;
-use Hibla\EventLoop\Managers\SignalManager;
-use Hibla\EventLoop\Managers\StreamManager;
-use Hibla\EventLoop\Managers\TimerManager;
+use Hibla\EventLoop\Interfaces\FiberManagerInterface;
+use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
+use Hibla\EventLoop\Interfaces\SignalManagerInterface;
+use Hibla\EventLoop\Interfaces\StreamManagerInterface;
+use Hibla\EventLoop\Interfaces\TimerManagerInterface;
+use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 
 /**
  * Orchestrates all units of work in the event loop:
@@ -17,16 +18,16 @@ use Hibla\EventLoop\Managers\TimerManager;
  * - Timers and fibers
  * - HTTP requests, sockets, streams, and file operations
  */
-class WorkHandler
+final class WorkHandler implements WorkHandlerInterface
 {
     public function __construct(
-        protected TimerManager $timerManager,
-        protected HttpRequestManager $httpRequestManager,
-        protected StreamManager $streamManager,
-        protected FiberManager $fiberManager,
-        protected TickHandler $tickHandler,
-        protected FileManager $fileManager,
-        protected SignalManager $signalManager,
+        private TimerManagerInterface $timerManager,
+        private HttpRequestManagerInterface $httpRequestManager,
+        private StreamManagerInterface $streamManager,
+        private FiberManagerInterface $fiberManager,
+        private TickHandler $tickHandler,
+        private FileManagerInterface $fileManager,
+        private SignalManagerInterface $signalManager,
     ) {
     }
 
@@ -65,8 +66,8 @@ class WorkHandler
 
         if ($this->signalManager->processSignals()) {
             $workDone = true;
-        } 
-        
+        }
+
         if ($this->tickHandler->processNextTickCallbacks()) {
             $workDone = true;
         }
@@ -77,7 +78,6 @@ class WorkHandler
         if ($timerWork || $fiberWork) {
             $workDone = true;
         }
-
 
         if ($this->processIOOperations()) {
             $workDone = true;
@@ -98,7 +98,7 @@ class WorkHandler
      *
      * @return bool True if any I/O work was performed.
      */
-    protected function processIOOperations(): bool
+    private function processIOOperations(): bool
     {
         $workDone = false;
 
