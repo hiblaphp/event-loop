@@ -12,6 +12,7 @@ use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
 use Hibla\EventLoop\Interfaces\FileManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
+use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
@@ -22,13 +23,9 @@ use Hibla\EventLoop\Managers\HttpRequestManager;
 use Hibla\EventLoop\Managers\SignalManager;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
-final class EventLoop
+final class EventLoopFactory implements LoopInterface
 {
-    private static ?EventLoop $instance = null;
-
-    private static bool $autoRunRegistered = false;
-
-    private static bool $explicitlyStopped = false;
+    private static ?EventLoopFactory $instance = null;
 
     private TimerManagerInterface $timerManager;
 
@@ -57,13 +54,14 @@ final class EventLoop
     private const float OPTIMIZATION_INTERVAL = 1.0;
     private const int MAX_ITERATIONS = 1000000;
     private bool $hasStarted = false;
+    private static bool $autoRunRegistered = false;
+    private static bool $explicitlyStopped = false;
 
     private function __construct()
     {
         $this->timerManager = EventLoopComponentFactory::createTimerManager();
         $this->fileManager = EventLoopComponentFactory::createFileManager();
         $this->streamManager = EventLoopComponentFactory::createStreamManager();
-        $this->fileManager = EventLoopComponentFactory::createFileManager();
         $this->httpRequestManager = new HttpRequestManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
@@ -90,29 +88,6 @@ final class EventLoop
     }
 
     /**
-     * Register shutdown function to auto-run the loop at script end.
-     */
-    private function registerAutoRun(): void
-    {
-        if (self::$autoRunRegistered) {
-            return;
-        }
-
-        self::$autoRunRegistered = true;
-
-        register_shutdown_function(function () {
-            $error = error_get_last();
-            if ((($error['type'] ?? 0) & (E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR)) !== 0) {
-                return;
-            }
-
-            if (! self::$explicitlyStopped && ! $this->hasStarted && $this->workHandler->hasWork()) {
-                $this->run();
-            }
-        });
-    }
-
-    /**
      * Get the timer manager.
      *
      * @return TimerManagerInterface The timer manager instance
@@ -128,7 +103,7 @@ final class EventLoop
      * Creates a new instance if one doesn't exist, otherwise returns
      * the existing instance to ensure only one event loop runs per process.
      *
-     * @return EventLoop The singleton event loop instance
+     * @return EventLoopFactory The singleton event loop instance
      */
     public static function getInstance(): self
     {
@@ -384,44 +359,6 @@ final class EventLoop
         return $this->stateHandler->isRunning();
     }
 
-    private function shouldOptimize(): bool
-    {
-        $now = microtime(true);
-
-        return ($now - $this->lastOptimizationCheck) > self::OPTIMIZATION_INTERVAL;
-    }
-
-    private function optimizeLoop(): void
-    {
-        $this->lastOptimizationCheck = microtime(true);
-
-        // Trigger garbage collection periodically to prevent memory buildup
-        if ($this->iterationCount % 1000 === 0) {
-            if (function_exists('gc_collect_cycles')) {
-                gc_collect_cycles();
-            }
-        }
-    }
-
-    /**
-     * Process one iteration of the event loop.
-     *
-     * Executes all available work and updates activity tracking.
-     * This is the core processing method called by the main run loop.
-     *
-     * @return bool True if work was processed, false if no work was available
-     */
-    private function tick(): bool
-    {
-        $workDone = $this->workHandler->processWork();
-
-        if ($workDone) {
-            $this->activityHandler->updateLastActivity();
-        }
-
-        return $workDone;
-    }
-
     /**
      * Stop the event loop execution.
      *
@@ -494,6 +431,67 @@ final class EventLoop
     public function getIterationCount(): int
     {
         return $this->iterationCount;
+    }
+
+    private function shouldOptimize(): bool
+    {
+        $now = microtime(true);
+
+        return ($now - $this->lastOptimizationCheck) > self::OPTIMIZATION_INTERVAL;
+    }
+
+    private function optimizeLoop(): void
+    {
+        $this->lastOptimizationCheck = microtime(true);
+
+        // Trigger garbage collection periodically to prevent memory buildup
+        if ($this->iterationCount % 1000 === 0) {
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
+            }
+        }
+    }
+
+    /**
+     * Register shutdown function to auto-run the loop at script end.
+     */
+    private function registerAutoRun(): void
+    {
+        if (self::$autoRunRegistered) {
+            return;
+        }
+
+        self::$autoRunRegistered = true;
+
+        register_shutdown_function(function () {
+            $error = error_get_last();
+            if ((($error['type'] ?? 0) & (E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR)) !== 0) {
+                return;
+            }
+
+            if (! self::$explicitlyStopped && ! $this->hasStarted && $this->workHandler->hasWork()) {
+                $this->run();
+            }
+        });
+    }
+
+    /**
+     * Process one iteration of the event loop.
+     *
+     * Executes all available work and updates activity tracking.
+     * This is the core processing method called by the main run loop.
+     *
+     * @return bool True if work was processed, false if no work was available
+     */
+    private function tick(): bool
+    {
+        $workDone = $this->workHandler->processWork();
+
+        if ($workDone) {
+            $this->activityHandler->updateLastActivity();
+        }
+
+        return $workDone;
     }
 
     /**

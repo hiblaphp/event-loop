@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 describe('EventLoop Shutdown', function () {
     it('stops gracefully', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = false;
 
         $loop->addTimer(0.001, function () use (&$executed, $loop) {
@@ -21,7 +21,7 @@ describe('EventLoop Shutdown', function () {
     });
 
     it('handles force shutdown', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
 
         $loop->addTimer(10.0, fn () => null);
         $loop->addPeriodicTimer(0.1, fn () => null);
@@ -34,7 +34,7 @@ describe('EventLoop Shutdown', function () {
     });
 
     it('cleans up resources on shutdown', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
 
         $loop->addTimer(1.0, fn () => null);
         $loop->nextTick(fn () => null);
@@ -53,7 +53,7 @@ describe('EventLoop Shutdown', function () {
     });
 
     it('handles shutdown with pending HTTP requests', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $completed = false;
 
         $loop->addHttpRequest('https://httpbin.org/delay/10', [], function () use (&$completed) {
@@ -66,7 +66,7 @@ describe('EventLoop Shutdown', function () {
     });
 
     it('respects graceful shutdown timeout', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $startTime = microtime(true);
         $periodicExecutions = 0;
 

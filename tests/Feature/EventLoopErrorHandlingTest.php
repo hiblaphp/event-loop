@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 describe('EventLoop Error Handling', function () {
     it('handles timer callback exceptions', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $goodCallbackExecuted = false;
 
         $loop->addTimer(0.001, function () {
@@ -28,7 +28,7 @@ describe('EventLoop Error Handling', function () {
     });
 
     it('handles nextTick callback exceptions', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = 0;
 
         $loop->nextTick(function () {
@@ -53,7 +53,7 @@ describe('EventLoop Error Handling', function () {
     });
 
     it('handles fiber exceptions', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $goodFiberCompleted = false;
 
         // Fiber that throws
@@ -81,7 +81,7 @@ describe('EventLoop Error Handling', function () {
     });
 
     it('handles stream callback exceptions', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $stream = createTestStream();
         $goodCallbackExecuted = false;
 
@@ -108,7 +108,7 @@ describe('EventLoop Error Handling', function () {
     });
 
     it('continues processing after resource cleanup errors', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = false;
 
         // Create invalid resource scenario
@@ -127,7 +127,7 @@ describe('EventLoop Error Handling', function () {
     });
 
     it('handles memory pressure gracefully', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
 
         $operationCount = 100000;
 

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 describe('EventLoop Stress Tests', function () {
     it('handles many timers without crashing', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = 0;
 
         $timerCount = 1000;
@@ -34,7 +34,7 @@ describe('EventLoop Stress Tests', function () {
     })->skipOnCI();
 
     it('handles adding many fibers without crashing', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $fiberCount = 1000;
 
         for ($i = 0; $i < $fiberCount; $i++) {
@@ -54,7 +54,7 @@ describe('EventLoop Stress Tests', function () {
     });
 
     it('handles rapid nextTick scheduling', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = 0;
         $tickCount = 500;
 
@@ -74,7 +74,7 @@ describe('EventLoop Stress Tests', function () {
     });
 
     it('maintains performance with mixed workload', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $counters = [
             'timers' => 0,
             'periodic' => 0,
@@ -118,7 +118,7 @@ describe('EventLoop Stress Tests', function () {
     });
 
     it('handles memory efficiently with many operations', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $initialMemory = memory_get_usage();
 
         for ($i = 0; $i < 1000; $i++) {

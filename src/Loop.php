@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Hibla\EventLoop;
 
 use Fiber;
-use Hibla\EventLoop\Interfaces\TimerManagerInterface;
+use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 /**
@@ -15,16 +15,38 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 final class Loop
 {
     /**
+     * Custom loop instance (if set)
+     */
+    private static ?LoopInterface $customInstance = null;
+
+    /**
      * Get the singleton instance of the event loop.
      *
      * Creates a new instance if one doesn't exist, otherwise returns
      * the existing instance to ensure only one event loop runs per process.
      *
-     * @return EventLoop The singleton event loop instance
+     * @return LoopInterface The event loop instance
      */
-    public static function getInstance(): EventLoop
+    public static function getInstance(): LoopInterface
     {
-        return EventLoop::getInstance();
+        if (self::$customInstance !== null) {
+            return self::$customInstance;
+        }
+
+        return EventLoopFactory::getInstance();
+    }
+
+    /**
+     * Set a custom event loop instance.
+     *
+     * This allows replacing the default EventLoop with a custom implementation.
+     * Useful for testing or providing alternative event loop implementations.
+     *
+     * @param LoopInterface|null $instance The custom loop instance, or null to reset to default
+     */
+    public static function setInstance(?LoopInterface $instance): void
+    {
+        self::$customInstance = $instance;
     }
 
     /**
@@ -37,7 +59,7 @@ final class Loop
      */
     public static function addSignal(int $signal, callable $callback): string
     {
-        return EventLoop::getInstance()->addSignal($signal, $callback);
+        return self::getInstance()->addSignal($signal, $callback);
     }
 
     /**
@@ -48,7 +70,7 @@ final class Loop
      */
     public static function removeSignal(string $signalId): bool
     {
-        return EventLoop::getInstance()->removeSignal($signalId);
+        return self::getInstance()->removeSignal($signalId);
     }
 
     /**
@@ -60,7 +82,7 @@ final class Loop
      */
     public static function addTimer(float $delay, callable $callback): string
     {
-        return EventLoop::getInstance()->addTimer($delay, $callback);
+        return self::getInstance()->addTimer($delay, $callback);
     }
 
     /**
@@ -73,17 +95,7 @@ final class Loop
      */
     public static function addPeriodicTimer(float $interval, callable $callback, ?int $maxExecutions = null): string
     {
-        return EventLoop::getInstance()->addPeriodicTimer($interval, $callback, $maxExecutions);
-    }
-
-    /**
-     * Check if event loop has any pending timers.
-     *
-     * @return bool True if there are pending timers, false otherwise
-     */
-    public static function hasTimers(): bool
-    {
-        return EventLoop::getInstance()->hasTimers();
+        return self::getInstance()->addPeriodicTimer($interval, $callback, $maxExecutions);
     }
 
     /**
@@ -94,7 +106,7 @@ final class Loop
      */
     public static function cancelTimer(string $timerId): bool
     {
-        return EventLoop::getInstance()->cancelTimer($timerId);
+        return self::getInstance()->cancelTimer($timerId);
     }
 
     /**
@@ -107,7 +119,7 @@ final class Loop
      */
     public static function addHttpRequest(string $url, array $options, callable $callback): string
     {
-        return EventLoop::getInstance()->addHttpRequest($url, $options, $callback);
+        return self::getInstance()->addHttpRequest($url, $options, $callback);
     }
 
     /**
@@ -118,7 +130,7 @@ final class Loop
      */
     public static function cancelHttpRequest(string $requestId): bool
     {
-        return EventLoop::getInstance()->cancelHttpRequest($requestId);
+        return self::getInstance()->cancelHttpRequest($requestId);
     }
 
     /**
@@ -131,7 +143,7 @@ final class Loop
      */
     public static function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
-        return EventLoop::getInstance()->addStreamWatcher($stream, $callback, $type);
+        return self::getInstance()->addStreamWatcher($stream, $callback, $type);
     }
 
     /**
@@ -142,7 +154,7 @@ final class Loop
      */
     public static function removeStreamWatcher(string $watcherId): bool
     {
-        return EventLoop::getInstance()->removeStreamWatcher($watcherId);
+        return self::getInstance()->removeStreamWatcher($watcherId);
     }
 
     /**
@@ -152,7 +164,7 @@ final class Loop
      */
     public static function addFiber(Fiber $fiber): void
     {
-        EventLoop::getInstance()->addFiber($fiber);
+        self::getInstance()->addFiber($fiber);
     }
 
     /**
@@ -165,7 +177,7 @@ final class Loop
      */
     public static function nextTick(callable $callback): void
     {
-        EventLoop::getInstance()->nextTick($callback);
+        self::getInstance()->nextTick($callback);
     }
 
     /**
@@ -178,7 +190,7 @@ final class Loop
      */
     public static function defer(callable $callback): void
     {
-        EventLoop::getInstance()->defer($callback);
+        self::getInstance()->defer($callback);
     }
 
     /**
@@ -189,7 +201,7 @@ final class Loop
      */
     public static function run(): void
     {
-        EventLoop::getInstance()->run();
+        self::getInstance()->run();
     }
 
     /**
@@ -199,7 +211,7 @@ final class Loop
      */
     public static function forceStop(): void
     {
-        EventLoop::getInstance()->forceStop();
+        self::getInstance()->forceStop();
     }
 
     /**
@@ -209,7 +221,7 @@ final class Loop
      */
     public static function isRunning(): bool
     {
-        return EventLoop::getInstance()->isRunning();
+        return self::getInstance()->isRunning();
     }
 
     /**
@@ -220,7 +232,7 @@ final class Loop
      */
     public static function stop(): void
     {
-        EventLoop::getInstance()->stop();
+        self::getInstance()->stop();
     }
 
     /**
@@ -233,7 +245,7 @@ final class Loop
      */
     public static function isIdle(): bool
     {
-        return EventLoop::getInstance()->isIdle();
+        return self::getInstance()->isIdle();
     }
 
     /**
@@ -253,7 +265,7 @@ final class Loop
         callable $callback,
         array $options = []
     ): string {
-        return EventLoop::getInstance()->addFileOperation($type, $path, $data, $callback, $options);
+        return self::getInstance()->addFileOperation($type, $path, $data, $callback, $options);
     }
 
     /**
@@ -264,7 +276,7 @@ final class Loop
      */
     public static function cancelFileOperation(string $operationId): bool
     {
-        return EventLoop::getInstance()->cancelFileOperation($operationId);
+        return self::getInstance()->cancelFileOperation($operationId);
     }
 
     /**
@@ -277,7 +289,7 @@ final class Loop
      */
     public static function addFileWatcher(string $path, callable $callback, array $options = []): string
     {
-        return EventLoop::getInstance()->addFileWatcher($path, $callback, $options);
+        return self::getInstance()->addFileWatcher($path, $callback, $options);
     }
 
     /**
@@ -288,27 +300,7 @@ final class Loop
      */
     public static function removeFileWatcher(string $watcherId): bool
     {
-        return EventLoop::getInstance()->removeFileWatcher($watcherId);
-    }
-
-    /**
-     * Get current iteration count (useful for debugging/monitoring)
-     *
-     * @return int Current iteration count
-     */
-    public static function getIterationCount(): int
-    {
-        return EventLoop::getInstance()->getIterationCount();
-    }
-
-    /**
-     * Get the timer manager.
-     *
-     * @return TimerManagerInterface The timer manager instance
-     */
-    public static function getTimerManager(): TimerManagerInterface
-    {
-        return EventLoop::getInstance()->getTimerManager();
+        return self::getInstance()->removeFileWatcher($watcherId);
     }
 
     /**
@@ -316,6 +308,7 @@ final class Loop
      */
     public static function reset(): void
     {
-        EventLoop::reset();
+        self::$customInstance = null;
+        EventLoopFactory::reset();
     }
 }

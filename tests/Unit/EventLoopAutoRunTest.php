@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 beforeEach(function () {
-    EventLoop::reset();
+    EventLoopFactory::reset();
 });
 
 afterEach(function () {
-    EventLoop::reset();
+    EventLoopFactory::reset();
 });
 
 describe('EventLoop Auto-Run Feature', function () {
@@ -21,9 +21,9 @@ describe('EventLoop Auto-Run Feature', function () {
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->addTimer(0.1, function () {
     file_put_contents('%s', 'executed');
@@ -51,9 +51,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->addTimer(0.1, function () {
     $content = file_exists('%s') ? file_get_contents('%s') : '';
@@ -82,9 +82,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->addTimer(0.1, function () {
     file_put_contents('%s', 'executed');
@@ -114,9 +114,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 file_put_contents('%s', 'no-auto-run');
 PHP;
@@ -140,9 +140,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->nextTick(function () {
     file_put_contents('%s', 'next-tick');
@@ -168,9 +168,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->defer(function () {
     file_put_contents('%s', 'deferred');
@@ -196,9 +196,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->addPeriodicTimer(0.05, function () {
     $content = file_exists('%s') ? file_get_contents('%s') : '';
@@ -225,9 +225,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 $loop->addTimer(0.1, function () {
     file_put_contents('%s', 'executed');
@@ -257,9 +257,9 @@ PHP;
 <?php
 require 'vendor/autoload.php';
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
-$loop = EventLoop::getInstance();
+$loop = EventLoopFactory::getInstance();
 
 // Add multiple types of work
 $loop->addTimer(0.1, function () use (&$counter) {

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 describe('EventLoop Integration', function () {
     it('runs a complete event loop cycle', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $results = [];
 
         $loop->nextTick(function () use (&$results) {
@@ -33,7 +33,7 @@ describe('EventLoop Integration', function () {
     });
 
     it('handles multiple timers correctly', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $results = [];
 
         $loop->addTimer(0.001, function () use (&$results) {
@@ -55,7 +55,7 @@ describe('EventLoop Integration', function () {
     });
 
     it('handles periodic timers', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $count = 0;
 
         $loop->addPeriodicTimer(0.001, function () use (&$count) {
@@ -72,7 +72,7 @@ describe('EventLoop Integration', function () {
     });
 
     it('can cancel timers', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $executed = false;
 
         $timerId = $loop->addTimer(0.001, function () use (&$executed) {
@@ -89,7 +89,7 @@ describe('EventLoop Integration', function () {
     });
 
     it('processes stream watchers', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $stream = createTestStream();
         $read = false;
 
@@ -110,7 +110,7 @@ describe('EventLoop Integration', function () {
     });
 
     it('handles fiber execution', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
 
         $fiber = new Fiber(function () {
             $value = Fiber::suspend('waiting');

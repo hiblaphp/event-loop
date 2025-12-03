@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\IOHandlers\File;
 
-use Generator;
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 use Hibla\EventLoop\ValueObjects\FileOperation;
-use Hibla\EventLoop\ValueObjects\StreamWatcher;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
 final class FileOperationHandler
 {
-    private const CHUNK_SIZE = 8192;
+    private const int CHUNK_SIZE = 8192;
 
     /**
      * @param callable|null $onOperationComplete Callback to notify when operation completes: fn(string $operationId): void
@@ -72,360 +70,7 @@ final class FileOperationHandler
         $options = $operation->getOptions();
         $useStreaming = $options['use_streaming'] ?? false;
 
-        return is_scalar($useStreaming) && (bool) $useStreaming;
-    }
-
-    private function handleWriteFromGenerator(FileOperation $operation): void
-    {
-        if ($operation->isCancelled()) {
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        $path = $operation->getPath();
-        $generator = $operation->getData();
-        $options = $operation->getOptions();
-
-        if (! $generator instanceof Generator) {
-            throw new InvalidArgumentException('Data must be a Generator for write_generator operation.');
-        }
-
-        $createDirs = $options['create_directories'] ?? false;
-        if (\is_scalar($createDirs) && (bool) $createDirs) {
-            $dir = dirname($path);
-            if (! is_dir($dir)) {
-                if (! mkdir($dir, 0755, true)) {
-                    $operation->executeCallback("Failed to create directory: $dir");
-                    $this->completeOperation($operation);
-
-                    return;
-                }
-            }
-        }
-
-        $mode = 'wb';
-        $flagsRaw = $options['flags'] ?? 0;
-        if (is_numeric($flagsRaw) && (((int) $flagsRaw & FILE_APPEND) !== 0)) {
-            $mode = 'ab';
-        }
-
-        $stream = @fopen($path, $mode);
-        if ($stream === false) {
-            $operation->executeCallback("Failed to open file for writing: $path");
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        stream_set_blocking($stream, false);
-        stream_set_write_buffer($stream, 8192);
-
-        $bytesWritten = 0;
-        $currentChunk = '';
-        $chunkOffset = 0;
-
-        $this->scheduleGeneratorWrite(
-            $operation,
-            $stream,
-            $generator,
-            $bytesWritten,
-            $currentChunk,
-            $chunkOffset
-        );
-    }
-
-    /**
-     * @param resource $stream
-     * @param-out string $currentChunk
-     */
-    private function scheduleGeneratorWrite(
-        FileOperation $operation,
-        $stream,
-        Generator $generator,
-        int &$bytesWritten,
-        string &$currentChunk,
-        int &$chunkOffset
-    ): void {
-        // Check for cancellation at the start of each iteration
-        if ($operation->isCancelled()) {
-            fclose($stream);
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        $chunksPerTick = 100;
-        $chunksProcessed = 0;
-
-        while ($chunksProcessed < $chunksPerTick) {
-            // Check cancellation in the loop
-            // @phpstan-ignore-next-line if.alwaysFalse
-            if ($operation->isCancelled()) {
-                fclose($stream);
-                $this->completeOperation($operation);
-
-                return;
-            }
-
-            if ($chunkOffset >= strlen($currentChunk)) {
-                if (! $generator->valid()) {
-                    fclose($stream);
-                    $operation->executeCallback(null, $bytesWritten);
-                    $this->completeOperation($operation);
-
-                    return;
-                }
-
-                $chunkValue = $generator->current();
-
-                if (! is_string($chunkValue)) {
-                    fclose($stream);
-                    $operation->executeCallback('Generator must yield string chunks');
-                    $this->completeOperation($operation);
-
-                    return;
-                }
-
-                $currentChunk = $chunkValue;
-                $chunkOffset = 0;
-                $generator->next();
-            }
-
-            $remainingData = substr($currentChunk, $chunkOffset);
-            $written = @fwrite($stream, $remainingData);
-
-            if ($written === false) {
-                fclose($stream);
-                $operation->executeCallback('Failed to write to file');
-                $this->completeOperation($operation);
-
-                return;
-            }
-
-            if ($written === 0) {
-                $watcherId = EventLoop::getInstance()->addStreamWatcher(
-                    $stream,
-                    function () use ($operation, $stream, $generator, &$bytesWritten, &$currentChunk, &$chunkOffset, &$watcherId) {
-                        if ($watcherId !== null) {
-                            EventLoop::getInstance()->removeStreamWatcher($watcherId);
-                        }
-                        $this->scheduleGeneratorWrite(
-                            $operation,
-                            $stream,
-                            $generator,
-                            $bytesWritten,
-                            $currentChunk,
-                            $chunkOffset
-                        );
-                    },
-                    StreamWatcher::TYPE_WRITE
-                );
-
-                return;
-            }
-
-            $bytesWritten += $written;
-            $chunkOffset += $written;
-            $chunksProcessed++;
-        }
-
-        EventLoop::getInstance()->nextTick(function () use ($operation, $stream, $generator, &$bytesWritten, &$currentChunk, &$chunkOffset) {
-            $this->scheduleGeneratorWrite(
-                $operation,
-                $stream,
-                $generator,
-                $bytesWritten,
-                $currentChunk,
-                $chunkOffset
-            );
-        });
-    }
-
-    /**
-     * Handle reading a file as a generator for memory-efficient streaming.
-     */
-    private function handleReadAsGenerator(FileOperation $operation): void
-    {
-        if ($operation->isCancelled()) {
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        $path = $operation->getPath();
-        $options = $operation->getOptions();
-
-        if (! file_exists($path)) {
-            $operation->executeCallback("File does not exist: $path");
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        if (! is_readable($path)) {
-            $operation->executeCallback("File is not readable: $path");
-            $this->completeOperation($operation);
-
-            return;
-        }
-
-        $readMode = $options['read_mode'] ?? 'chunks';
-
-        if ($readMode === 'lines') {
-            $generator = $this->createLineGenerator($path, $options, $operation);
-        } else {
-            $generator = $this->createChunkGenerator($path, $options, $operation);
-        }
-
-        $operation->executeCallback(null, $generator);
-        $this->completeOperation($operation);
-    }
-
-    /**
-     * Create a generator that yields file chunks.
-     *
-     * @param  array<string,mixed>  $options  ['chunk_size'=>int, 'offset'=>int, 'length'=>int].
-     */
-    private function createChunkGenerator(string $path, array $options, FileOperation $operation): Generator
-    {
-        $chunkSizeRaw = $options['chunk_size'] ?? self::CHUNK_SIZE;
-        $chunkSize = is_numeric($chunkSizeRaw) ? max(1, (int) $chunkSizeRaw) : self::CHUNK_SIZE;
-
-        $offsetRaw = $options['offset'] ?? 0;
-        $offset = is_numeric($offsetRaw) ? (int) $offsetRaw : 0;
-
-        $lengthRaw = $options['length'] ?? null;
-        $maxLength = is_numeric($lengthRaw) ? max(0, (int) $lengthRaw) : null;
-
-        $stream = @fopen($path, 'rb');
-        if ($stream === false) {
-            throw new RuntimeException("Failed to open file: $path");
-        }
-
-        if ($offset > 0) {
-            fseek($stream, $offset);
-        }
-
-        $bytesRead = 0;
-        $chunkCounter = 0;
-
-        try {
-            while (! feof($stream)) {
-                if ($operation->isCancelled()) {
-                    break;
-                }
-
-                $readSize = $chunkSize;
-                if ($maxLength !== null) {
-                    $remaining = $maxLength - $bytesRead;
-                    if ($remaining <= 0) {
-                        break;
-                    }
-                    $readSize = min($chunkSize, $remaining);
-                }
-
-                $chunk = fread($stream, $readSize);
-                if ($chunk === false) {
-                    throw new RuntimeException("Failed to read from file: $path");
-                }
-
-                if ($chunk === '') {
-                    break;
-                }
-
-                $bytesRead += strlen($chunk);
-                yield $chunk;
-
-                $chunkCounter++;
-                if ($chunkCounter % 10 === 0) {
-                    EventLoop::getInstance()->addTimer(0, function () {});
-                }
-            }
-        } finally {
-            fclose($stream);
-        }
-    }
-
-    /**
-     * Create a generator that yields file lines.
-     *
-     * @param  array<string,mixed>  $options
-     */
-    /**
-     * Create a generator that yields file lines.
-     *
-     * @param  array<string,mixed>  $options
-     */
-    private function createLineGenerator(string $path, array $options, FileOperation $operation): Generator
-    {
-        $chunkSizeRaw = $options['chunk_size'] ?? self::CHUNK_SIZE;
-        $chunkSize = is_numeric($chunkSizeRaw) ? max(1, (int) $chunkSizeRaw) : self::CHUNK_SIZE;
-
-        $trim = $options['trim'] ?? false;
-        $trim = \is_scalar($trim) && (bool) $trim;
-
-        $skipEmpty = $options['skip_empty'] ?? false;
-        $skipEmpty = \is_scalar($skipEmpty) && (bool) $skipEmpty;
-
-        $stream = @fopen($path, 'rb');
-        if ($stream === false) {
-            throw new RuntimeException("Failed to open file: $path");
-        }
-
-        $buffer = '';
-        $lineCount = 0;
-
-        try {
-            while (! feof($stream)) {
-                if ($operation->isCancelled()) {
-                    break;
-                }
-
-                $chunk = fread($stream, $chunkSize);
-                if ($chunk === false) {
-                    throw new RuntimeException("Failed to read from file: $path");
-                }
-
-                $buffer .= $chunk;
-
-                // Process complete lines in buffer
-                // Handle all line ending types: \r\n, \n, \r
-                while (preg_match('/^(.*?)(\r\n|\n|\r)/', $buffer, $matches)) {
-                    $line = $matches[1];  // Line content without line ending
-                    $buffer = substr($buffer, strlen($matches[0]));  // Remove processed part
-
-                    if ($trim) {
-                        $line = trim($line);
-                    }
-
-                    if ($skipEmpty && $line === '') {
-                        continue;
-                    }
-
-                    yield $line;
-                    $lineCount++;
-
-                    // Yield control periodically (every 100 lines)
-                    if ($lineCount % 100 === 0) {
-                        EventLoop::getInstance()->addTimer(0, function () {});
-                    }
-                }
-            }
-
-            // Yield any remaining content in buffer (last line without newline)
-            if ($buffer !== '') {
-                if ($trim) {
-                    $buffer = trim($buffer);
-                }
-
-                if (! $skipEmpty || $buffer !== '') {
-                    yield $buffer;
-                }
-            }
-        } finally {
-            fclose($stream);
-        }
+        return \is_scalar($useStreaming) && (bool) $useStreaming;
     }
 
     private function executeStreamingOperation(FileOperation $operation): void
@@ -541,9 +186,9 @@ final class FileOperationHandler
         }
 
         $content .= $chunk;
-        $bytesRead += strlen($chunk);
+        $bytesRead += \strlen($chunk);
 
-        EventLoop::getInstance()->addTimer(0, function () use ($operation, $stream, &$content, &$bytesRead, $maxLength) {
+        EventLoopFactory::getInstance()->addTimer(0, function () use ($operation, $stream, &$content, &$bytesRead, $maxLength) {
             $this->scheduleStreamRead($operation, $stream, $content, $bytesRead, $maxLength);
         });
     }
@@ -558,7 +203,7 @@ final class FileOperationHandler
 
         $path = $operation->getPath();
         $data = $operation->getData();
-        if (! is_scalar($data)) {
+        if (! \is_scalar($data)) {
             $operation->executeCallback('Invalid data provided for writing. Must be a scalar value.');
             $this->completeOperation($operation);
 
@@ -568,7 +213,7 @@ final class FileOperationHandler
         $options = $operation->getOptions();
 
         $createDirs = $options['create_directories'] ?? false;
-        if (is_scalar($createDirs) && (bool) $createDirs) {
+        if (\is_scalar($createDirs) && (bool) $createDirs) {
             $dir = dirname($path);
             if (! is_dir($dir)) {
                 if (! mkdir($dir, 0755, true)) {
@@ -594,7 +239,7 @@ final class FileOperationHandler
             return;
         }
 
-        $dataLength = strlen($data);
+        $dataLength = \strlen($data);
         $bytesWritten = 0;
 
         $this->scheduleStreamWrite($operation, $stream, $data, $bytesWritten, $dataLength);
@@ -635,7 +280,7 @@ final class FileOperationHandler
 
         $bytesWritten += $written;
 
-        EventLoop::getInstance()->addTimer(0, function () use ($operation, $stream, $data, &$bytesWritten, $totalLength) {
+        EventLoopFactory::getInstance()->addTimer(0, function () use ($operation, $stream, $data, &$bytesWritten, $totalLength) {
             $this->scheduleStreamWrite($operation, $stream, $data, $bytesWritten, $totalLength);
         });
     }
@@ -691,7 +336,6 @@ final class FileOperationHandler
      */
     private function scheduleStreamCopy(FileOperation $operation, $sourceStream, $destStream): void
     {
-        // Check for cancellation at the start of each iteration
         if ($operation->isCancelled()) {
             fclose($sourceStream);
             fclose($destStream);
@@ -729,7 +373,7 @@ final class FileOperationHandler
             return;
         }
 
-        EventLoop::getInstance()->addTimer(0, function () use ($operation, $sourceStream, $destStream) {
+        EventLoopFactory::getInstance()->addTimer(0, function () use ($operation, $sourceStream, $destStream) {
             $this->scheduleStreamCopy($operation, $sourceStream, $destStream);
         });
     }
@@ -750,14 +394,6 @@ final class FileOperationHandler
                     break;
                 case 'write':
                     $this->handleWrite($operation);
-
-                    break;
-                case 'write_generator':
-                    $this->handleWriteFromGenerator($operation);
-
-                    break;
-                case 'read_generator':
-                    $this->handleReadAsGenerator($operation);
 
                     break;
                 case 'append':
@@ -796,8 +432,6 @@ final class FileOperationHandler
                     $availableTypes = [
                         'read',
                         'write',
-                        'write_generator',
-                        'read_generator',
                         'append',
                         'delete',
                         'exists',
@@ -872,7 +506,7 @@ final class FileOperationHandler
         $flags = is_numeric($flagsRaw) ? (int) $flagsRaw : 0;
 
         $createDirs = $options['create_directories'] ?? false;
-        if (is_scalar($createDirs) && (bool) $createDirs) {
+        if (\is_scalar($createDirs) && (bool) $createDirs) {
             $dir = dirname($path);
             if (! is_dir($dir)) {
                 $mkdirResult = @mkdir($dir, 0755, true);
@@ -1086,7 +720,7 @@ final class FileOperationHandler
         $sourcePath = $operation->getPath();
         $destinationPath = $operation->getData();
 
-        if (! is_string($destinationPath)) {
+        if (! \is_string($destinationPath)) {
             $operation->executeCallback('Destination path for copy must be a string.');
             $this->completeOperation($operation);
 
@@ -1123,7 +757,7 @@ final class FileOperationHandler
         $oldPath = $operation->getPath();
         $newPath = $operation->getData();
 
-        if (! is_string($newPath)) {
+        if (! \is_string($newPath)) {
             $operation->executeCallback(error: 'New path for rename must be a string.');
 
             return;

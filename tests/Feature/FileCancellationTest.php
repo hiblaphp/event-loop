@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 function setupCancellationTest(): void
 {
-    EventLoop::reset();
+    EventLoopFactory::reset();
 
     $tempDir = __DIR__ . '/../temp';
     if (! is_dir($tempDir)) {
@@ -21,19 +21,19 @@ function teardownCancellationTest(array $testFiles): void
             unlink($file);
         }
     }
-    EventLoop::reset();
+    EventLoopFactory::reset();
 }
 
 function runAsyncTest(callable $testCallback, callable $assertionCallback, float $timeout = 0.2): void
 {
     $testCallback();
 
-    EventLoop::getInstance()->addTimer($timeout, function () use ($assertionCallback) {
+    EventLoopFactory::getInstance()->addTimer($timeout, function () use ($assertionCallback) {
         $assertionCallback();
-        EventLoop::getInstance()->stop();
+        EventLoopFactory::getInstance()->stop();
     });
 
-    EventLoop::getInstance()->run();
+    EventLoopFactory::getInstance()->run();
 }
 
 function captureOperationResult(): array
@@ -66,7 +66,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testFile, $largeData, &$state) {
-                    $operationId = EventLoop::getInstance()->addFileOperation(
+                    $operationId = EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile,
                         $largeData,
@@ -78,8 +78,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
-                        $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+                    EventLoopFactory::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
+                        $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
                     });
                 },
                 function () use ($testFile, $dataSize, &$state) {
@@ -118,7 +118,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testFile, &$state) {
-                    $operationId = EventLoop::getInstance()->addFileOperation(
+                    $operationId = EventLoopFactory::getInstance()->addFileOperation(
                         'read',
                         $testFile,
                         null,
@@ -130,8 +130,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
-                        $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+                    EventLoopFactory::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
+                        $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
                     });
                 },
                 function () use ($fileSize, &$state) {
@@ -177,7 +177,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testSource, $testDest, &$state) {
-                    $operationId = EventLoop::getInstance()->addFileOperation(
+                    $operationId = EventLoopFactory::getInstance()->addFileOperation(
                         'copy',
                         $testSource,
                         $testDest,
@@ -189,8 +189,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
-                        $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+                    EventLoopFactory::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
+                        $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
                     });
                 },
                 function () use ($testDest, $sourceSize, &$state) {
@@ -237,7 +237,7 @@ describe('Mid-Flight Stream Cancellation', function () {
                         }
                     })();
 
-                    $operationId = EventLoop::getInstance()->addFileOperation(
+                    $operationId = EventLoopFactory::getInstance()->addFileOperation(
                         'write_generator',
                         $testFile,
                         $generator,
@@ -248,8 +248,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                         }
                     );
 
-                    EventLoop::getInstance()->nextTick(function () use ($operationId, &$state) {
-                        $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+                    EventLoopFactory::getInstance()->nextTick(function () use ($operationId, &$state) {
+                        $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
                     });
                 },
                 function () use ($testFile, &$chunksYielded, &$state) {
@@ -286,7 +286,7 @@ describe('Mid-Flight Stream Cancellation', function () {
             $rapidData = str_repeat('RAPID', 200000); // 1MB
             $state = captureOperationResult();
 
-            $operationId = EventLoop::getInstance()->addFileOperation(
+            $operationId = EventLoopFactory::getInstance()->addFileOperation(
                 'write',
                 $testFile,
                 $rapidData,
@@ -296,7 +296,7 @@ describe('Mid-Flight Stream Cancellation', function () {
                 ['use_streaming' => true]
             );
 
-            $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+            $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
 
             runAsyncTest(
                 function () {},
@@ -322,7 +322,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             $state = captureOperationResult();
 
-            $operationId = EventLoop::getInstance()->addFileOperation(
+            $operationId = EventLoopFactory::getInstance()->addFileOperation(
                 'write',
                 $testFile,
                 str_repeat('DATA', 100000),
@@ -333,7 +333,7 @@ describe('Mid-Flight Stream Cancellation', function () {
                 ['use_streaming' => true]
             );
 
-            $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+            $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
 
             runAsyncTest(
                 function () {},
@@ -362,7 +362,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testFile, $largeData, &$state) {
-                    $operationId = EventLoop::getInstance()->addFileOperation(
+                    $operationId = EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile,
                         $largeData,
@@ -372,8 +372,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
-                        $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+                    EventLoopFactory::getInstance()->addTimer(0.005, function () use ($operationId, &$state) {
+                        $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
                     });
                 },
                 function () use ($testFile, $dataSize, &$state) {
@@ -417,7 +417,7 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testFile1, $testFile2, $testFile3, $data, &$state1, &$state2, &$state3) {
-                    $op1 = EventLoop::getInstance()->addFileOperation(
+                    $op1 = EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile1,
                         $data,
@@ -425,7 +425,7 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->addFileOperation(
+                    EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile2,
                         $data,
@@ -433,7 +433,7 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    $op3 = EventLoop::getInstance()->addFileOperation(
+                    $op3 = EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile3,
                         $data,
@@ -441,9 +441,9 @@ describe('Mid-Flight Stream Cancellation', function () {
                         ['use_streaming' => true]
                     );
 
-                    EventLoop::getInstance()->nextTick(function () use ($op1, $op3, &$state1, &$state3) {
-                        $state1['cancelled'] = EventLoop::getInstance()->cancelFileOperation($op1);
-                        $state3['cancelled'] = EventLoop::getInstance()->cancelFileOperation($op3);
+                    EventLoopFactory::getInstance()->nextTick(function () use ($op1, $op3, &$state1, &$state3) {
+                        $state1['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($op1);
+                        $state3['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($op3);
                     });
                 },
                 function () use (&$state1, &$state2, &$state3) {
@@ -466,7 +466,7 @@ describe('Mid-Flight Stream Cancellation', function () {
         setupCancellationTest();
 
         try {
-            $result = EventLoop::getInstance()->cancelFileOperation('non-existent-id');
+            $result = EventLoopFactory::getInstance()->cancelFileOperation('non-existent-id');
             expect($result)->toBeFalse();
         } finally {
             teardownCancellationTest([]);
@@ -489,15 +489,15 @@ describe('Mid-Flight Stream Cancellation', function () {
 
             runAsyncTest(
                 function () use ($testFile, &$state) {
-                    $state['operationId'] = EventLoop::getInstance()->addFileOperation(
+                    $state['operationId'] = EventLoopFactory::getInstance()->addFileOperation(
                         'write',
                         $testFile,
                         'small data',
                         function () use (&$state) {
                             $state['completed'] = true;
 
-                            EventLoop::getInstance()->nextTick(function () use (&$state) {
-                                $state['cancelResult'] = EventLoop::getInstance()->cancelFileOperation(
+                            EventLoopFactory::getInstance()->nextTick(function () use (&$state) {
+                                $state['cancelResult'] = EventLoopFactory::getInstance()->cancelFileOperation(
                                     $state['operationId']
                                 );
                             });
@@ -526,7 +526,7 @@ describe('Mid-Flight Stream Cancellation', function () {
             $smallData = str_repeat('X', 100);
             $state = captureOperationResult();
 
-            $operationId = EventLoop::getInstance()->addFileOperation(
+            $operationId = EventLoopFactory::getInstance()->addFileOperation(
                 'write',
                 $testFile,
                 $smallData,
@@ -536,8 +536,8 @@ describe('Mid-Flight Stream Cancellation', function () {
                 ['use_streaming' => true]
             );
 
-            EventLoop::getInstance()->nextTick(function () use ($operationId, &$state) {
-                $state['cancelled'] = EventLoop::getInstance()->cancelFileOperation($operationId);
+            EventLoopFactory::getInstance()->nextTick(function () use ($operationId, &$state) {
+                $state['cancelled'] = EventLoopFactory::getInstance()->cancelFileOperation($operationId);
             });
 
             runAsyncTest(

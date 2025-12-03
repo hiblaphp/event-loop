@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\EventLoop;
+use Hibla\EventLoop\EventLoopFactory;
 
 describe('EventLoop Performance', function () {
     test('benchmarks timer performance', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $timerCount = 1000;
         $executed = 0;
 
@@ -34,7 +34,7 @@ describe('EventLoop Performance', function () {
     })->group('performance');
 
     test('benchmarks nextTick performance', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $tickCount = 1000;
         $executed = 0;
 
@@ -62,7 +62,7 @@ describe('EventLoop Performance', function () {
     })->group('performance');
 
     test('benchmarks mixed workload performance', function () {
-        $loop = EventLoop::getInstance();
+        $loop = EventLoopFactory::getInstance();
         $counters = ['timers' => 0, 'ticks' => 0, 'deferred' => 0];
 
         $startTime = microtime(true);
