@@ -131,14 +131,14 @@ interface LoopInterface
      */
     public function nextTick(callable $callback): void;
 
-     /**
-     * Queue a microtask callback to run after nextTick but before timers.
-     *
-     * Microtasks are primarily used internally for Promise resolution callbacks.
-     * They run after all nextTick callbacks but before any timer or I/O operations.
-     *
-     * @param  callable  $callback  Function to execute as a microtask
-     */
+    /**
+    * Queue a microtask callback to run after nextTick but before timers.
+    *
+    * Microtasks are primarily used internally for Promise resolution callbacks.
+    * They run after all nextTick callbacks but before any timer or I/O operations.
+    *
+    * @param  callable  $callback  Function to execute as a microtask
+    */
     public function microTask(callable $callback): void;
 
     /**

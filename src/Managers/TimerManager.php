@@ -25,7 +25,7 @@ final class TimerManager implements TimerManagerInterface
 
     private readonly TimerExecutionHandler $executionHandler;
     private readonly TimerScheduleHandler $scheduleHandler;
-    
+
     private bool $queueNeedsRebuild = false;
 
     public function __construct()
@@ -40,8 +40,8 @@ final class TimerManager implements TimerManagerInterface
     {
         $timer = $this->scheduleHandler->createTimer($delay, $callback);
         $this->timers[$timer->getId()] = $timer;
-        
-        $this->timerQueue->insert($timer, -$timer->getExecuteAt());
+
+        $this->timerQueue->insert($timer, (int)(-$timer->getExecuteAt() * 1000000));
 
         return $timer->getId();
     }
@@ -50,8 +50,8 @@ final class TimerManager implements TimerManagerInterface
     {
         $periodicTimer = new PeriodicTimer($interval, $callback, $maxExecutions);
         $this->timers[$periodicTimer->getId()] = $periodicTimer;
-        
-        $this->timerQueue->insert($periodicTimer, -$periodicTimer->getExecuteAt());
+
+        $this->timerQueue->insert($periodicTimer, (int)(-$periodicTimer->getExecuteAt() * 1000000));
 
         return $periodicTimer->getId();
     }
@@ -60,7 +60,7 @@ final class TimerManager implements TimerManagerInterface
     {
         if (isset($this->timers[$timerId])) {
             unset($this->timers[$timerId]);
-          
+
             $this->queueNeedsRebuild = true;
 
             return true;
@@ -76,7 +76,7 @@ final class TimerManager implements TimerManagerInterface
 
     /**
      * Check if there are any timers ready to execute now.
-     * 
+     *
      * @return bool True if at least one timer is ready
      */
     public function hasReadyTimers(): bool
@@ -90,20 +90,22 @@ final class TimerManager implements TimerManagerInterface
         }
 
         $currentTime = microtime(true);
-        
+
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-        
+
         // Check if the top timer (earliest) is ready
-        while (!$this->timerQueue->isEmpty()) {
+        while (! $this->timerQueue->isEmpty()) {
+            /** @var array{priority: int, data: Timer|PeriodicTimer} $item */
             $item = $this->timerQueue->top();
             $timer = $item['data'];
-            
+
             // Skip cancelled timers
-            if (!isset($this->timers[$timer->getId()])) {
+            if (! isset($this->timers[$timer->getId()])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
-            
+
             return $timer->isReady($currentTime);
         }
 
@@ -123,19 +125,21 @@ final class TimerManager implements TimerManagerInterface
         $currentTime = microtime(true);
 
         // Find and process the first ready timer
-        while (!$this->timerQueue->isEmpty()) {
+        while (! $this->timerQueue->isEmpty()) {
             $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
+            /** @var array{priority: int, data: Timer|PeriodicTimer} $item */
             $item = $this->timerQueue->top();
             $timer = $item['data'];
-            
+
             // Skip cancelled timers
-            if (!isset($this->timers[$timer->getId()])) {
-                $this->timerQueue->extract(); 
+            if (! isset($this->timers[$timer->getId()])) {
+                $this->timerQueue->extract();
+
                 continue;
             }
 
             // If not ready, no more timers are ready (queue is sorted)
-            if (!$timer->isReady($currentTime)) {
+            if (! $timer->isReady($currentTime)) {
                 return false;
             }
 
@@ -147,7 +151,7 @@ final class TimerManager implements TimerManagerInterface
 
                 if ($timer->shouldContinue()) {
                     // Re-insert for next execution
-                    $this->timerQueue->insert($timer, -$timer->getExecuteAt());
+                    $this->timerQueue->insert($timer, (int)(-$timer->getExecuteAt() * 1000000));
                 } else {
                     unset($this->timers[$timer->getId()]);
                 }
@@ -179,19 +183,22 @@ final class TimerManager implements TimerManagerInterface
         }
 
         $currentTime = microtime(true);
-    
+
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-        
-        while (!$this->timerQueue->isEmpty()) {
+
+        while (! $this->timerQueue->isEmpty()) {
+            /** @var array{priority: int, data: Timer|PeriodicTimer} $item */
             $item = $this->timerQueue->top();
             $timer = $item['data'];
-            
-            if (!isset($this->timers[$timer->getId()])) {
+
+            if (! isset($this->timers[$timer->getId()])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
-            
+
             $delay = $timer->getExecuteAt() - $currentTime;
+
             return $delay > 0 ? $delay : 0.0;
         }
 
@@ -234,12 +241,11 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * @param  string  $timerId
      * @return array<string, mixed>|null
      */
     public function getTimerInfo(string $timerId): ?array
     {
-        if (!isset($this->timers[$timerId])) {
+        if (! isset($this->timers[$timerId])) {
             return null;
         }
 
@@ -269,7 +275,7 @@ final class TimerManager implements TimerManagerInterface
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
 
         foreach ($this->timers as $timer) {
-            $this->timerQueue->insert($timer, -$timer->getExecuteAt());
+            $this->timerQueue->insert($timer, (int)(-$timer->getExecuteAt() * 1000000));
         }
 
         $this->queueNeedsRebuild = false;

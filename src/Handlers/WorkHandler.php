@@ -22,7 +22,8 @@ final class WorkHandler implements WorkHandlerInterface
         private TickHandler $tickHandler,
         private FileManagerInterface $fileManager,
         private SignalManagerInterface $signalManager,
-    ) {}
+    ) {
+    }
 
     public function hasWork(): bool
     {
@@ -99,17 +100,16 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-
         return $workDone;
     }
 
     /**
      * Process nextTick callbacks and microtasks with correct priority.
      * NextTick always has higher priority than microtasks.
-     * 
+     *
      * This keeps looping until both the nextTick and microtask queues are
      * completely empty, ensuring proper draining semantics.
-     * 
+     *
      * @return bool True if any work was processed
      */
     private function processTicksAndMicrotasks(): bool
@@ -121,7 +121,7 @@ final class WorkHandler implements WorkHandlerInterface
                 $workDone = true;
             }
 
-            if (!$this->tickHandler->hasTickCallbacks()) {
+            if (! $this->tickHandler->hasTickCallbacks()) {
                 if ($this->tickHandler->processMicrotasks()) {
                     $workDone = true;
                 }

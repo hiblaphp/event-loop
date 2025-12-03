@@ -11,7 +11,7 @@ final readonly class TimerExecutionHandler
 {
     /**
      * Execute all ready timers from the provided array
-     * 
+     *
      * @param  array<string, Timer>  &$timers
      * @param  float  $currentTime
      * @return bool True if at least one timer was executed
@@ -33,7 +33,7 @@ final readonly class TimerExecutionHandler
 
     /**
      * Get all timers that are ready for execution
-     * 
+     *
      * @param  array<string, Timer>  $timers
      * @param  float  $currentTime
      * @return array<string, Timer>

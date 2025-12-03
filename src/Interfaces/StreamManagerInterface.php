@@ -29,8 +29,10 @@ interface StreamManagerInterface
 
     /**
      * Processes streams that are ready for I/O.
+     *
+     * @return bool True if any streams were processed
      */
-    public function processStreams(): void;
+    public function processStreams(): bool;
 
     /**
      * Checks if there are any registered watchers.

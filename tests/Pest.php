@@ -12,7 +12,6 @@ afterEach(function () {
     EventLoopFactory::reset();
 });
 
-
 expect()->extend('toBeResource', function () {
     return $this->toBeResource();
 });
@@ -23,7 +22,6 @@ expect()->extend('toBeValidTimestamp', function () {
         ->toBeLessThan(time() + 3600)
     ;
 });
-
 
 function skipOnCI(): void
 {
@@ -41,7 +39,6 @@ function createTestStream()
 
     return $stream;
 }
-
 
 function runLoopFor(float $seconds): void
 {

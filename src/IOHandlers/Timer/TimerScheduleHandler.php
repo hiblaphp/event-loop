@@ -15,7 +15,7 @@ final readonly class TimerScheduleHandler
 
     /**
      * Get the next execution time from a set of timers
-     * 
+     *
      * @param  Timer[]  $timers
      * @return float|null
      */
@@ -36,7 +36,7 @@ final readonly class TimerScheduleHandler
 
     /**
      * Calculate delay until next timer execution
-     * 
+     *
      * @param  Timer[]  $timers
      * @param  float  $currentTime
      * @return float|null

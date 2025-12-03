@@ -146,9 +146,9 @@ describe('TickHandler', function () {
     it('can clear all callback types', function () {
         $handler = new TickHandler();
 
-        $handler->addNextTick(fn() => null);
-        $handler->addMicrotask(fn() => null);
-        $handler->addDeferred(fn() => null);
+        $handler->addNextTick(fn () => null);
+        $handler->addMicrotask(fn () => null);
+        $handler->addDeferred(fn () => null);
 
         expect($handler->hasTickCallbacks())->toBeTrue();
         expect($handler->hasMicrotaskCallbacks())->toBeTrue();
@@ -166,12 +166,12 @@ describe('TickHandler', function () {
     it('provides accurate statistics', function () {
         $handler = new TickHandler();
 
-        $handler->addNextTick(fn() => null);
-        $handler->addNextTick(fn() => null);
-        $handler->addMicrotask(fn() => null);
-        $handler->addMicrotask(fn() => null);
-        $handler->addMicrotask(fn() => null);
-        $handler->addDeferred(fn() => null);
+        $handler->addNextTick(fn () => null);
+        $handler->addNextTick(fn () => null);
+        $handler->addMicrotask(fn () => null);
+        $handler->addMicrotask(fn () => null);
+        $handler->addMicrotask(fn () => null);
+        $handler->addDeferred(fn () => null);
 
         $stats = $handler->getStats();
 
@@ -186,9 +186,9 @@ describe('TickHandler', function () {
     it('updates statistics after processing', function () {
         $handler = new TickHandler();
 
-        $handler->addNextTick(fn() => null);
-        $handler->addMicrotask(fn() => null);
-        $handler->addDeferred(fn() => null);
+        $handler->addNextTick(fn () => null);
+        $handler->addMicrotask(fn () => null);
+        $handler->addDeferred(fn () => null);
 
         expect($handler->getStats()['total_callbacks'])->toBe(3);
 
@@ -217,7 +217,7 @@ describe('TickHandler', function () {
 
         // With draining behavior, all microtasks are processed in one call
         $handler->processMicrotasks();
-        
+
         // All 3 microtasks should have executed (draining behavior)
         expect($count)->toBe(3);
         expect($handler->hasMicrotaskCallbacks())->toBeFalse();

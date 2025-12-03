@@ -65,7 +65,7 @@ final class TickHandler
                 $callback();
                 $processed = true;
             } catch (\Throwable $e) {
-                error_log("NextTick callback error: " . $e->getMessage());
+                error_log('NextTick callback error: ' . $e->getMessage());
             }
         }
 
@@ -81,7 +81,7 @@ final class TickHandler
         $processed = false;
         $iterations = 0;
 
-        while (!$this->microtaskCallbacks->isEmpty() && $iterations < $maxIterations) {
+        while (! $this->microtaskCallbacks->isEmpty() && $iterations < $maxIterations) {
             $callback = $this->microtaskCallbacks->dequeue();
 
             try {
@@ -89,11 +89,11 @@ final class TickHandler
                 $processed = true;
                 $iterations++;
             } catch (\Throwable $e) {
-                error_log("Microtask callback error: " . $e->getMessage());
+                error_log('Microtask callback error: ' . $e->getMessage());
             }
         }
 
-        if ($iterations >= $maxIterations && !$this->microtaskCallbacks->isEmpty()) {
+        if ($iterations >= $maxIterations && ! $this->microtaskCallbacks->isEmpty()) {
             error_log("Warning: Microtask queue exceeded max iterations ($maxIterations). Possible infinite loop detected.");
         }
 
@@ -115,12 +115,12 @@ final class TickHandler
             }
 
             $callback = $this->deferredCallbacks->dequeue();
-            
+
             try {
                 $callback();
                 $processed = true;
             } catch (\Throwable $e) {
-                error_log("Deferred callback error: " . $e->getMessage());
+                error_log('Deferred callback error: ' . $e->getMessage());
             }
         }
 
@@ -136,24 +136,24 @@ final class TickHandler
 
     public function hasTickCallbacks(): bool
     {
-        return !$this->tickCallbacks->isEmpty();
+        return ! $this->tickCallbacks->isEmpty();
     }
 
     public function hasMicrotaskCallbacks(): bool
     {
-        return !$this->microtaskCallbacks->isEmpty();
+        return ! $this->microtaskCallbacks->isEmpty();
     }
 
     public function hasDeferredCallbacks(): bool
     {
-        return !$this->deferredCallbacks->isEmpty();
+        return ! $this->deferredCallbacks->isEmpty();
     }
 
     public function hasWork(): bool
     {
-        return !$this->tickCallbacks->isEmpty()
-            || !$this->microtaskCallbacks->isEmpty()
-            || !$this->deferredCallbacks->isEmpty();
+        return ! $this->tickCallbacks->isEmpty()
+            || ! $this->microtaskCallbacks->isEmpty()
+            || ! $this->deferredCallbacks->isEmpty();
     }
 
     /**
@@ -165,8 +165,8 @@ final class TickHandler
             'tick_callbacks' => $this->tickCallbacks->count(),
             'microtask_callbacks' => $this->microtaskCallbacks->count(),
             'deferred_callbacks' => $this->deferredCallbacks->count(),
-            'total_callbacks' => $this->tickCallbacks->count() 
-                + $this->microtaskCallbacks->count() 
+            'total_callbacks' => $this->tickCallbacks->count()
+                + $this->microtaskCallbacks->count()
                 + $this->deferredCallbacks->count(),
         ];
     }

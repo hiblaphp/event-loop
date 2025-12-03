@@ -50,17 +50,21 @@ final class StreamManager implements StreamManagerInterface
         return false;
     }
 
-    public function processStreams(): void
+    public function processStreams(): bool
     {
         if (\count($this->watchers) === 0) {
-            return;
+            return false;
         }
 
         $readyStreams = $this->selectHandler->selectStreams($this->watchers);
 
         if (\count($readyStreams) > 0) {
             $this->selectHandler->processReadyStreams($readyStreams, $this->watchers);
+
+            return true;
         }
+
+        return false;
     }
 
     public function hasWatchers(): bool
