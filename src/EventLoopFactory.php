@@ -49,10 +49,6 @@ final class EventLoopFactory implements LoopInterface
 
     private SignalManagerInterface $signalManager;
 
-    private int $iterationCount = 0;
-    private float $lastOptimizationCheck = 0;
-    private const float OPTIMIZATION_INTERVAL = 1.0;
-    private const int MAX_ITERATIONS = 1000000;
     private bool $hasStarted = false;
     private static bool $autoRunRegistered = false;
     private static bool $explicitlyStopped = false;
@@ -291,20 +287,11 @@ final class EventLoopFactory implements LoopInterface
     public function run(): void
     {
         while ($this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
-            $this->iterationCount++;
             $hasImmediateWork = $this->tick();
-
-            if ($this->shouldOptimize()) {
-                $this->optimizeLoop();
-            }
 
             if ($this->sleepHandler->shouldSleep($hasImmediateWork)) {
                 $sleepTime = $this->sleepHandler->calculateOptimalSleep();
                 $this->sleepHandler->sleep($sleepTime);
-            }
-
-            if ($this->iterationCount >= self::MAX_ITERATIONS) {
-                $this->iterationCount = 0;
             }
         }
 
@@ -448,33 +435,6 @@ final class EventLoopFactory implements LoopInterface
     public function removeFileWatcher(string $watcherId): bool
     {
         return $this->fileManager->removeFileWatcher($watcherId);
-    }
-
-    /**
-     * Get current iteration count (useful for debugging/monitoring)
-     */
-    public function getIterationCount(): int
-    {
-        return $this->iterationCount;
-    }
-
-    private function shouldOptimize(): bool
-    {
-        $now = microtime(true);
-
-        return ($now - $this->lastOptimizationCheck) > self::OPTIMIZATION_INTERVAL;
-    }
-
-    private function optimizeLoop(): void
-    {
-        $this->lastOptimizationCheck = microtime(true);
-
-        // Trigger garbage collection periodically to prevent memory buildup
-        if ($this->iterationCount % 1000 === 0) {
-            if (function_exists('gc_collect_cycles')) {
-                gc_collect_cycles();
-            }
-        }
     }
 
     /**
