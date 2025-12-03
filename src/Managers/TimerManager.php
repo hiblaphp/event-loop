@@ -263,10 +263,6 @@ final class TimerManager implements TimerManagerInterface
         return $baseInfo;
     }
 
-    /**
-     * Rebuild the priority queue from the timers array
-     * This is needed after cancellations or when the queue gets out of sync
-     */
     private function rebuildQueue(): void
     {
         $this->timerQueue = new SplPriorityQueue();
