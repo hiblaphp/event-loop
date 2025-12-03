@@ -81,10 +81,6 @@ describe('EventLoop Performance', function () {
             });
         }
 
-        $loop->addTimer(0.1, function () use ($loop) {
-            $loop->stop();
-        });
-
         $loop->run();
 
         $duration = microtime(true) - $startTime;
@@ -95,5 +91,7 @@ describe('EventLoop Performance', function () {
         expect($opsPerSecond)->toBeGreaterThan(10000);
 
         echo "\nMixed Workload Performance: {$opsPerSecond} operations/second\n";
+        echo "Duration: {$duration}s\n";
+        echo "Breakdown - Timers: {$counters['timers']}, Ticks: {$counters['ticks']}, Deferred: {$counters['deferred']}\n";
     })->group('performance');
 })->group('performance');

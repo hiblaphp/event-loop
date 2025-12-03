@@ -30,7 +30,6 @@ describe('EventLoop Stress Tests', function () {
         expect($duration)->toBeLessThan(3.0);
 
         expect(true)->toBeTrue();
-
     })->skipOnCI();
 
     it('handles adding many fibers without crashing', function () {
@@ -38,7 +37,7 @@ describe('EventLoop Stress Tests', function () {
         $fiberCount = 1000;
 
         for ($i = 0; $i < $fiberCount; $i++) {
-            $fiber = new Fiber(fn () => 'done');
+            $fiber = new Fiber(fn() => 'done');
             $loop->addFiber($fiber);
         }
 
@@ -102,10 +101,6 @@ describe('EventLoop Stress Tests', function () {
             }, 3);
         }
 
-        $loop->addTimer(0.1, function () use ($loop) {
-            $loop->stop();
-        });
-
         $startTime = microtime(true);
         $loop->run();
         $duration = microtime(true) - $startTime;
@@ -113,7 +108,7 @@ describe('EventLoop Stress Tests', function () {
         expect($counters['timers'])->toBe(50);
         expect($counters['ticks'])->toBe(50);
         expect($counters['deferred'])->toBe(50);
-        expect($counters['periodic'])->toBe(30); // 10 timers * 3 executions
+        expect($counters['periodic'])->toBe(30);
         expect($duration)->toBeLessThan(1.0);
     });
 

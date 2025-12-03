@@ -22,8 +22,7 @@ final class WorkHandler implements WorkHandlerInterface
         private TickHandler $tickHandler,
         private FileManagerInterface $fileManager,
         private SignalManagerInterface $signalManager,
-    ) {
-    }
+    ) {}
 
     public function hasWork(): bool
     {
@@ -77,18 +76,30 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        if ($this->processCheckPhase()) {
-            $workDone = true;
-        }
-
         if ($this->fiberManager->processFibers()) {
             $workDone = true;
             $this->processTicksAndMicrotasks();
         }
 
-        if ($this->tickHandler->processDeferredCallbacks()) {
+        if ($this->processCheckPhase()) {
             $workDone = true;
-            $this->processTicksAndMicrotasks();
+        }
+
+        $hasPendingWork = $this->tickHandler->hasTickCallbacks()
+            || $this->tickHandler->hasMicrotaskCallbacks()
+            || $this->tickHandler->hasImmediateCallbacks()
+            || $this->timerManager->hasTimers()
+            || $this->httpRequestManager->hasRequests()
+            || $this->fileManager->hasWork()
+            || $this->streamManager->hasWatchers()
+            || $this->fiberManager->hasFibers()
+            || $this->signalManager->hasSignals();
+
+        if (!$hasPendingWork && $this->tickHandler->hasDeferredCallbacks()) {
+            if ($this->tickHandler->processDeferredCallbacks()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks();
+            }
         }
 
         return $workDone;
