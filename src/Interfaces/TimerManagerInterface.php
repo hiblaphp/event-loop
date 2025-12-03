@@ -51,6 +51,13 @@ interface TimerManagerInterface
     public function hasTimers(): bool;
 
     /**
+     * Checks if there are any ready timers.
+     *
+     * @return bool True if there are ready timers
+     */
+    public function hasReadyTimers(): bool;
+
+    /**
      * Gets the delay until the next timer fires.
      *
      * @return float|null Delay in seconds, or null if no timers

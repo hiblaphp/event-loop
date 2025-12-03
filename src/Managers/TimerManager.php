@@ -9,6 +9,7 @@ use Hibla\EventLoop\IOHandlers\Timer\TimerExecutionHandler;
 use Hibla\EventLoop\IOHandlers\Timer\TimerScheduleHandler;
 use Hibla\EventLoop\ValueObjects\PeriodicTimer;
 use Hibla\EventLoop\ValueObjects\Timer;
+use SplPriorityQueue;
 
 final class TimerManager implements TimerManagerInterface
 {
@@ -17,50 +18,50 @@ final class TimerManager implements TimerManagerInterface
      */
     private array $timers = [];
 
+    /**
+     * @var SplPriorityQueue<int, Timer|PeriodicTimer>
+     */
+    private SplPriorityQueue $timerQueue;
+
     private readonly TimerExecutionHandler $executionHandler;
     private readonly TimerScheduleHandler $scheduleHandler;
+    
+    private bool $queueNeedsRebuild = false;
 
     public function __construct()
     {
         $this->executionHandler = new TimerExecutionHandler();
         $this->scheduleHandler = new TimerScheduleHandler();
+        $this->timerQueue = new SplPriorityQueue();
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
     }
 
-    /**
-     * @param  float  $delay
-     * @param  callable  $callback
-     * @return string The unique ID of the created timer.
-     */
     public function addTimer(float $delay, callable $callback): string
     {
         $timer = $this->scheduleHandler->createTimer($delay, $callback);
         $this->timers[$timer->getId()] = $timer;
+        
+        $this->timerQueue->insert($timer, -$timer->getExecuteAt());
 
         return $timer->getId();
     }
 
-    /**
-     * @param  float  $interval
-     * @param  callable  $callback
-     * @param  int|null  $maxExecutions
-     * @return string The unique ID of the created periodic timer.
-     */
     public function addPeriodicTimer(float $interval, callable $callback, ?int $maxExecutions = null): string
     {
         $periodicTimer = new PeriodicTimer($interval, $callback, $maxExecutions);
         $this->timers[$periodicTimer->getId()] = $periodicTimer;
+        
+        $this->timerQueue->insert($periodicTimer, -$periodicTimer->getExecuteAt());
 
         return $periodicTimer->getId();
     }
 
-    /**
-     * @param  string  $timerId
-     * @return bool True if the timer was found and canceled, false otherwise.
-     */
     public function cancelTimer(string $timerId): bool
     {
         if (isset($this->timers[$timerId])) {
             unset($this->timers[$timerId]);
+          
+            $this->queueNeedsRebuild = true;
 
             return true;
         }
@@ -68,54 +69,141 @@ final class TimerManager implements TimerManagerInterface
         return false;
     }
 
-    /**
-     * @param  string  $timerId  The ID of the timer to check.
-     * @return bool True if the timer exists.
-     */
     public function hasTimer(string $timerId): bool
     {
         return isset($this->timers[$timerId]);
     }
 
     /**
-     * @return bool True if at least one timer was executed.
+     * Check if there are any timers ready to execute now.
+     * 
+     * @return bool True if at least one timer is ready
      */
-    public function processTimers(): bool
+    public function hasReadyTimers(): bool
     {
+        if ($this->queueNeedsRebuild) {
+            $this->rebuildQueue();
+        }
+
+        if ($this->timerQueue->isEmpty()) {
+            return false;
+        }
+
         $currentTime = microtime(true);
+        
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
+        
+        // Check if the top timer (earliest) is ready
+        while (!$this->timerQueue->isEmpty()) {
+            $item = $this->timerQueue->top();
+            $timer = $item['data'];
+            
+            // Skip cancelled timers
+            if (!isset($this->timers[$timer->getId()])) {
+                $this->timerQueue->extract();
+                continue;
+            }
+            
+            return $timer->isReady($currentTime);
+        }
 
-        $regularExecuted = $this->processRegularTimers($currentTime);
-        $periodicExecuted = $this->processPeriodicTimers($currentTime);
-
-        return $regularExecuted || $periodicExecuted;
+        return false;
     }
 
-    /**
-     * @return bool True if there is at least one active timer.
-     */
+    public function processTimers(): bool
+    {
+        if ($this->queueNeedsRebuild) {
+            $this->rebuildQueue();
+        }
+
+        if ($this->timerQueue->isEmpty()) {
+            return false;
+        }
+
+        $currentTime = microtime(true);
+
+        // Find and process the first ready timer
+        while (!$this->timerQueue->isEmpty()) {
+            $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
+            $item = $this->timerQueue->top();
+            $timer = $item['data'];
+            
+            // Skip cancelled timers
+            if (!isset($this->timers[$timer->getId()])) {
+                $this->timerQueue->extract(); 
+                continue;
+            }
+
+            // If not ready, no more timers are ready (queue is sorted)
+            if (!$timer->isReady($currentTime)) {
+                return false;
+            }
+
+            // Extract and execute this timer
+            $this->timerQueue->extract();
+
+            if ($timer instanceof PeriodicTimer) {
+                $timer->execute();
+
+                if ($timer->shouldContinue()) {
+                    // Re-insert for next execution
+                    $this->timerQueue->insert($timer, -$timer->getExecuteAt());
+                } else {
+                    unset($this->timers[$timer->getId()]);
+                }
+            } else {
+                $this->executionHandler->executeTimer($timer);
+                unset($this->timers[$timer->getId()]);
+            }
+
+            // Return after processing ONE timer
+            return true;
+        }
+
+        return false;
+    }
+
     public function hasTimers(): bool
     {
         return \count($this->timers) > 0;
     }
 
-    /**
-     * @return float|null The delay until the next timer, or null if no timers are pending.
-     */
     public function getNextTimerDelay(): ?float
     {
+        if ($this->queueNeedsRebuild) {
+            $this->rebuildQueue();
+        }
+
+        if ($this->timerQueue->isEmpty()) {
+            return null;
+        }
+
         $currentTime = microtime(true);
+    
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
+        
+        while (!$this->timerQueue->isEmpty()) {
+            $item = $this->timerQueue->top();
+            $timer = $item['data'];
+            
+            if (!isset($this->timers[$timer->getId()])) {
+                $this->timerQueue->extract();
+                continue;
+            }
+            
+            $delay = $timer->getExecuteAt() - $currentTime;
+            return $delay > 0 ? $delay : 0.0;
+        }
 
-        // Convert mixed Timer|PeriodicTimer array to Timer array for calculateDelay
-        $regularTimers = array_filter($this->timers, fn ($timer): bool => $timer instanceof Timer);
-        /** @var array<Timer> $regularTimersTyped */
-        $regularTimersTyped = array_values($regularTimers);
-
-        return $this->scheduleHandler->calculateDelay($regularTimersTyped, $currentTime);
+        return null;
     }
 
     public function clearAllTimers(): void
     {
         $this->timers = [];
+        $this->timerQueue = new SplPriorityQueue();
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
+        $this->queueNeedsRebuild = false;
     }
 
     /**
@@ -141,6 +229,7 @@ final class TimerManager implements TimerManagerInterface
             'periodic_timers' => $periodicCount,
             'total_timers' => count($this->timers),
             'total_periodic_executions' => $totalExecutions,
+            'queue_needs_rebuild' => $this->queueNeedsRebuild,
         ];
     }
 
@@ -150,7 +239,7 @@ final class TimerManager implements TimerManagerInterface
      */
     public function getTimerInfo(string $timerId): ?array
     {
-        if (! isset($this->timers[$timerId])) {
+        if (!isset($this->timers[$timerId])) {
             return null;
         }
 
@@ -175,58 +264,18 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * @param  float  $currentTime
-     * @return bool
+     * Rebuild the priority queue from the timers array
+     * This is needed after cancellations or when the queue gets out of sync
      */
-    private function processRegularTimers(float $currentTime): bool
+    private function rebuildQueue(): void
     {
-        $executed = false;
+        $this->timerQueue = new SplPriorityQueue();
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
 
-        foreach ($this->timers as $timerId => $timer) {
-            if ($timer instanceof PeriodicTimer) {
-                continue;
-            }
-
-            if ($timer->isReady($currentTime)) {
-                $this->executionHandler->executeTimer($timer);
-                unset($this->timers[$timerId]);
-                $executed = true;
-            }
+        foreach ($this->timers as $timer) {
+            $this->timerQueue->insert($timer, -$timer->getExecuteAt());
         }
 
-        return $executed;
-    }
-
-    /**
-     * @param  float  $currentTime
-     * @return bool
-     */
-    private function processPeriodicTimers(float $currentTime): bool
-    {
-        $hasExecutedAny = false;
-        $timersToRemove = [];
-
-        foreach ($this->timers as $timerId => $timer) {
-            if (! $timer instanceof PeriodicTimer) {
-                continue;
-            }
-
-            if ($timer->isReady($currentTime)) {
-                $timer->execute();
-                $hasExecutedAny = true;
-
-                // Remove completed periodic timers
-                if (! $timer->shouldContinue()) {
-                    $timersToRemove[] = $timerId;
-                }
-            }
-        }
-
-        // Clean up completed periodic timers
-        foreach ($timersToRemove as $timerId) {
-            unset($this->timers[$timerId]);
-        }
-
-        return $hasExecutedAny;
+        $this->queueNeedsRebuild = false;
     }
 }

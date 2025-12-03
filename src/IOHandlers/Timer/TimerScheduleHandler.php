@@ -8,17 +8,14 @@ use Hibla\EventLoop\ValueObjects\Timer;
 
 final readonly class TimerScheduleHandler
 {
-    /**
-     * @param  float  $delay
-     * @param  callable  $callback
-     * @return Timer
-     */
     public function createTimer(float $delay, callable $callback): Timer
     {
         return new Timer($delay, $callback);
     }
 
     /**
+     * Get the next execution time from a set of timers
+     * 
      * @param  Timer[]  $timers
      * @return float|null
      */
@@ -34,10 +31,12 @@ final readonly class TimerScheduleHandler
             $nextExecuteTime = min($nextExecuteTime, $timer->getExecuteAt());
         }
 
-        return $nextExecuteTime;
+        return $nextExecuteTime === PHP_FLOAT_MAX ? null : $nextExecuteTime;
     }
 
     /**
+     * Calculate delay until next timer execution
+     * 
      * @param  Timer[]  $timers
      * @param  float  $currentTime
      * @return float|null
@@ -52,6 +51,6 @@ final readonly class TimerScheduleHandler
 
         $delay = $nextExecuteTime - $currentTime;
 
-        return $delay > 0 ? $delay : 0;
+        return $delay > 0 ? $delay : 0.0;
     }
 }

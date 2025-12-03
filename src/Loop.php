@@ -181,6 +181,19 @@ final class Loop
     }
 
     /**
+     * Schedule a microtask to run after the current work phase.
+     *
+     * Microtasks are processed after all immediate work and before
+     * any timers or fibers. Use for short, high-priority tasks.
+     *
+     * @param  callable  $callback  Function to execute as a microtask
+     */
+    public static function microTask(callable $callback): void
+    {
+        self::getInstance()->microTask($callback);
+    }
+
+    /**
      * Schedule a callback to run after the current work phase.
      *
      * Deferred callbacks run after all immediate work is processed

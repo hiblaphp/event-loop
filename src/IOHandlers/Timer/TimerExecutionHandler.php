@@ -10,9 +10,11 @@ use Throwable;
 final readonly class TimerExecutionHandler
 {
     /**
+     * Execute all ready timers from the provided array
+     * 
      * @param  array<string, Timer>  &$timers
      * @param  float  $currentTime
-     * @return bool True if at least one timer was executed, false otherwise.
+     * @return bool True if at least one timer was executed
      */
     public function executeReadyTimers(array &$timers, float $currentTime): bool
     {
@@ -21,7 +23,6 @@ final readonly class TimerExecutionHandler
         foreach ($timers as $timerId => $timer) {
             if ($timer->isReady($currentTime)) {
                 $this->executeTimer($timer);
-
                 unset($timers[$timerId]);
                 $processed = true;
             }
@@ -31,6 +32,8 @@ final readonly class TimerExecutionHandler
     }
 
     /**
+     * Get all timers that are ready for execution
+     * 
      * @param  array<string, Timer>  $timers
      * @param  float  $currentTime
      * @return array<string, Timer>
@@ -43,12 +46,21 @@ final readonly class TimerExecutionHandler
         );
     }
 
+    /**
+     * Execute a single timer with error handling
+     */
     public function executeTimer(Timer $timer): void
     {
         try {
             $timer->execute();
         } catch (Throwable $e) {
-            error_log('Timer callback error for timer '.$timer->getId().': '.$e->getMessage());
+            error_log(sprintf(
+                'Timer callback error for timer %s: %s in %s:%d',
+                $timer->getId(),
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            ));
         }
     }
 }

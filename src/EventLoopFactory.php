@@ -245,6 +245,19 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
+     * Queue a microtask callback to run after nextTick but before timers.
+     *
+     * Microtasks are primarily used internally for Promise resolution callbacks or creating new microtasks.
+     * They run after all nextTick callbacks but before any timer or I/O operations.
+     *
+     * @param  callable  $callback  Function to execute as a microtask
+     */
+    public function microTask(callable $callback): void
+    {
+        $this->tickHandler->addMicrotask($callback);
+    }
+
+    /**
      * Schedule a callback to run after the current work phase.
      *
      * Deferred callbacks run after all immediate work is processed

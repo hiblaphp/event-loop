@@ -12,12 +12,6 @@ use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 
-/**
- * Orchestrates all units of work in the event loop:
- * - Next-tick and deferred callbacks
- * - Timers and fibers
- * - HTTP requests, sockets, streams, and file operations
- */
 final class WorkHandler implements WorkHandlerInterface
 {
     public function __construct(
@@ -28,20 +22,11 @@ final class WorkHandler implements WorkHandlerInterface
         private TickHandler $tickHandler,
         private FileManagerInterface $fileManager,
         private SignalManagerInterface $signalManager,
-    ) {
-    }
+    ) {}
 
-    /**
-     * Determine if there is any pending work in the loop.
-     *
-     * Checks callbacks, timers, HTTP requests, file I/O, streams, sockets, and fibers.
-     *
-     * @return bool True if any work units are pending.
-     */
     public function hasWork(): bool
     {
-        return $this->tickHandler->hasTickCallbacks()
-            || $this->tickHandler->hasDeferredCallbacks()
+        return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
             || $this->fileManager->hasWork()
@@ -51,14 +36,18 @@ final class WorkHandler implements WorkHandlerInterface
     }
 
     /**
-     * Process one full cycle of work:
+     * Process one full cycle of work following Node.js event loop semantics:
      * 1. Signal Handling
-     * 2. Next-tick callbacks
-     * 3. Timers and fibers
-     * 4. I/O operations (HTTP, sockets, streams, files)
-     * 5. Deferred callbacks
+     * 2. NextTick callbacks (highest priority)
+     * 3. Microtasks (drained completely)
+     * 4. Timers (processed individually with microtask draining between each)
+     * 5. Fibers
+     * 6. I/O Operations
+     * 7. Deferred callbacks
      *
-     * @return bool True if any work was performed.
+     * Microtasks are drained after each major phase to match Node.js semantics.
+     * Timers are processed one at a time with nextTick/microtask draining between
+     * each timer to match Node.js behavior.
      */
     public function processWork(): bool
     {
@@ -68,35 +57,82 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        if ($this->tickHandler->processNextTickCallbacks()) {
+        if ($this->processTicksAndMicrotasks()) {
             $workDone = true;
         }
 
-        $timerWork = $this->timerManager->processTimers();
-        $fiberWork = $this->fiberManager->processFibers();
-
-        if ($timerWork || $fiberWork) {
+        if ($this->processTimersIndividually()) {
             $workDone = true;
+        }
+
+        if ($this->fiberManager->processFibers()) {
+            $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
         if ($this->processIOOperations()) {
             $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
         if ($this->tickHandler->processDeferredCallbacks()) {
             $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
         return $workDone;
     }
 
     /**
-     * Process all types of I/O in a single batch:
-     * - HTTP requests
-     * - Streams (only if watchers exist)
-     * - File operations
-     *
-     * @return bool True if any I/O work was performed.
+     * @return bool True if any timers were processed
+     */
+    private function processTimersIndividually(): bool
+    {
+        $workDone = false;
+
+        while ($this->timerManager->hasReadyTimers()) {
+            if ($this->timerManager->processTimers()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks();
+            } else {
+                break;
+            }
+        }
+
+
+        return $workDone;
+    }
+
+    /**
+     * Process nextTick callbacks and microtasks with correct priority.
+     * NextTick always has higher priority than microtasks.
+     * 
+     * This keeps looping until both the nextTick and microtask queues are
+     * completely empty, ensuring proper draining semantics.
+     * 
+     * @return bool True if any work was processed
+     */
+    private function processTicksAndMicrotasks(): bool
+    {
+        $workDone = false;
+
+        while ($this->tickHandler->hasTickCallbacks() || $this->tickHandler->hasMicrotaskCallbacks()) {
+            if ($this->tickHandler->processNextTickCallbacks()) {
+                $workDone = true;
+            }
+
+            if (!$this->tickHandler->hasTickCallbacks()) {
+                if ($this->tickHandler->processMicrotasks()) {
+                    $workDone = true;
+                }
+            }
+        }
+
+        return $workDone;
+    }
+
+    /**
+     * @return bool True if any I/O work was performed
      */
     private function processIOOperations(): bool
     {
@@ -107,8 +143,9 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->streamManager->hasWatchers()) {
-            $this->streamManager->processStreams();
-            $workDone = true;
+            if ($this->streamManager->processStreams()) {
+                $workDone = true;
+            }
         }
 
         if ($this->fileManager->processFileOperations()) {
