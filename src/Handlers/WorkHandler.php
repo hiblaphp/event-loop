@@ -41,14 +41,14 @@ final class WorkHandler implements WorkHandlerInterface
      * 1. Signal Handling
      * 2. NextTick callbacks (highest priority)
      * 3. Microtasks (drained completely)
-     * 4. Timers (processed individually with microtask draining between each)
-     * 5. Fibers
-     * 6. I/O Operations
-     * 7. Deferred callbacks
+     * 4. Timer Phase - process timers one at a time
+     * 5. Pending I/O Callbacks
+     * 6. Poll Phase - I/O Operations (if any)
+     * 7. Check Phase - setImmediate() callbacks (drains completely, including new ones)
+     * 8. Fibers
+     * 9. Close Callbacks Phase (Deferred)
      *
-     * Microtasks are drained after each major phase to match Node.js semantics.
-     * Timers are processed one at a time with nextTick/microtask draining between
-     * each timer to match Node.js behavior.
+     * NOTE: Check phase must complete before returning to Timers phase
      */
     public function processWork(): bool
     {
@@ -66,12 +66,22 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        if ($this->fiberManager->processFibers()) {
-            $workDone = true;
-            $this->processTicksAndMicrotasks();
+        $hasIO = $this->httpRequestManager->hasRequests()
+            || $this->streamManager->hasWatchers()
+            || $this->fileManager->hasWork();
+
+        if ($hasIO) {
+            if ($this->processIOOperations()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks();
+            }
         }
 
-        if ($this->processIOOperations()) {
+        if ($this->processCheckPhase()) {
+            $workDone = true;
+        }
+
+        if ($this->fiberManager->processFibers()) {
             $workDone = true;
             $this->processTicksAndMicrotasks();
         }
@@ -79,6 +89,29 @@ final class WorkHandler implements WorkHandlerInterface
         if ($this->tickHandler->processDeferredCallbacks()) {
             $workDone = true;
             $this->processTicksAndMicrotasks();
+        }
+
+        return $workDone;
+    }
+
+    /**
+     * Process the Check phase (setImmediate callbacks).
+     * This phase must completely drain all setImmediate callbacks,
+     * including ones added during processing, before moving to next phase.
+     *
+     * @return bool True if any work was processed
+     */
+    private function processCheckPhase(): bool
+    {
+        $workDone = false;
+
+        while ($this->tickHandler->hasImmediateCallbacks()) {
+            if ($this->tickHandler->processImmediateCallbacks()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks();
+            } else {
+                break;
+            }
         }
 
         return $workDone;

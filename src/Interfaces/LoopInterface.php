@@ -142,6 +142,15 @@ interface LoopInterface
     public function microTask(callable $callback): void;
 
     /**
+     * Schedules a callback to run on the next check phase of the event loop.
+     *
+     * Check phase callbacks run after all nextTick and microtask callbacks.
+     *
+     * @param  callable  $callback  The callback to execute on next check phase
+     */
+    public function setImmediate(callable $callback): void;
+
+    /**
      * Defers execution of a callback until the current call stack is empty.
      *
      * Similar to nextTick but with lower priority.

@@ -172,14 +172,16 @@ describe('TickHandler', function () {
         $handler->addMicrotask(fn () => null);
         $handler->addMicrotask(fn () => null);
         $handler->addDeferred(fn () => null);
+        $handler->addImmediate(fn () => null);
 
         $stats = $handler->getStats();
 
         expect($stats)->toBe([
             'tick_callbacks' => 2,
             'microtask_callbacks' => 3,
+            'immediate_callbacks' => 1,
             'deferred_callbacks' => 1,
-            'total_callbacks' => 6,
+            'total_callbacks' => 7,
         ]);
     });
 

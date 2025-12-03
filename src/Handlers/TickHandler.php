@@ -21,12 +21,18 @@ final class TickHandler
     /**
      * @var SplQueue<callable>
      */
+    private SplQueue $immediateCallbacks;
+
+    /**
+     * @var SplQueue<callable>
+     */
     private SplQueue $deferredCallbacks;
 
     public function __construct()
     {
         $this->tickCallbacks = new SplQueue();
         $this->microtaskCallbacks = new SplQueue();
+        $this->immediateCallbacks = new SplQueue();
         $this->deferredCallbacks = new SplQueue();
     }
 
@@ -40,11 +46,19 @@ final class TickHandler
         $this->microtaskCallbacks->enqueue($callback);
     }
 
+    public function addImmediate(callable $callback): void
+    {
+        $this->immediateCallbacks->enqueue($callback);
+    }
+
     public function addDeferred(callable $callback): void
     {
         $this->deferredCallbacks->enqueue($callback);
     }
 
+    /**
+     * @return bool True if any callbacks were processed
+     */
     public function processNextTickCallbacks(): bool
     {
         if ($this->tickCallbacks->isEmpty()) {
@@ -72,6 +86,9 @@ final class TickHandler
         return $processed;
     }
 
+    /**
+     * @return bool True if any callbacks were processed
+     */
     public function processMicrotasks(int $maxIterations = 10000): bool
     {
         if ($this->microtaskCallbacks->isEmpty()) {
@@ -100,6 +117,39 @@ final class TickHandler
         return $processed;
     }
 
+    /**
+     * @return bool True if any callbacks were processed
+     */
+    public function processImmediateCallbacks(): bool
+    {
+        if ($this->immediateCallbacks->isEmpty()) {
+            return false;
+        }
+
+        $processed = false;
+        $count = $this->immediateCallbacks->count();
+
+        for ($i = 0; $i < $count; $i++) {
+            if ($this->immediateCallbacks->isEmpty()) {
+                break;
+            }
+
+            $callback = $this->immediateCallbacks->dequeue();
+
+            try {
+                $callback();
+                $processed = true;
+            } catch (\Throwable $e) {
+                error_log('Immediate callback error: ' . $e->getMessage());
+            }
+        }
+
+        return $processed;
+    }
+
+    /**
+     * @return bool True if any callbacks were processed
+     */
     public function processDeferredCallbacks(): bool
     {
         if ($this->deferredCallbacks->isEmpty()) {
@@ -131,6 +181,7 @@ final class TickHandler
     {
         $this->tickCallbacks = new SplQueue();
         $this->microtaskCallbacks = new SplQueue();
+        $this->immediateCallbacks = new SplQueue();
         $this->deferredCallbacks = new SplQueue();
     }
 
@@ -144,6 +195,11 @@ final class TickHandler
         return ! $this->microtaskCallbacks->isEmpty();
     }
 
+    public function hasImmediateCallbacks(): bool
+    {
+        return ! $this->immediateCallbacks->isEmpty();
+    }
+
     public function hasDeferredCallbacks(): bool
     {
         return ! $this->deferredCallbacks->isEmpty();
@@ -153,6 +209,7 @@ final class TickHandler
     {
         return ! $this->tickCallbacks->isEmpty()
             || ! $this->microtaskCallbacks->isEmpty()
+            || ! $this->immediateCallbacks->isEmpty()
             || ! $this->deferredCallbacks->isEmpty();
     }
 
@@ -164,9 +221,11 @@ final class TickHandler
         return [
             'tick_callbacks' => $this->tickCallbacks->count(),
             'microtask_callbacks' => $this->microtaskCallbacks->count(),
+            'immediate_callbacks' => $this->immediateCallbacks->count(),
             'deferred_callbacks' => $this->deferredCallbacks->count(),
             'total_callbacks' => $this->tickCallbacks->count()
                 + $this->microtaskCallbacks->count()
+                + $this->immediateCallbacks->count()
                 + $this->deferredCallbacks->count(),
         ];
     }

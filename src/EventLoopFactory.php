@@ -258,6 +258,18 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
+     * Schedules a callback to run on the next check phase of the event loop.
+     *
+     * Check phase callbacks run after all nextTick and microtask callbacks.
+     *
+     * @param  callable  $callback  The callback to execute on next check phase
+     */
+    public function setImmediate(callable $callback): void
+    {
+        $this->tickHandler->addImmediate($callback);
+    }
+
+    /**
      * Schedule a callback to run after the current work phase.
      *
      * Deferred callbacks run after all immediate work is processed
