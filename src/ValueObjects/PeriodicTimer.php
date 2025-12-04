@@ -6,48 +6,28 @@ namespace Hibla\EventLoop\ValueObjects;
 
 final class PeriodicTimer
 {
-    private string $id;
+    public int $id;
 
     /**
      * @var callable
      */
-    private $callback;
+    public $callback;
 
-    private float $interval;
+    public float $executeAt;
 
-    private float $executeAt;
+    public float $interval;
 
-    private ?int $maxExecutions;
+    public ?int $maxExecutions;
+    
+    public int $executionCount = 0;
 
-    private int $executionCount = 0;
-
-    public function __construct(float $interval, callable $callback, ?int $maxExecutions = null)
+    public function __construct(int $id, float $interval, callable $callback, ?int $maxExecutions = null)
     {
-        $this->id = uniqid('periodic_timer_', true);
+        $this->id = $id;
         $this->callback = $callback;
         $this->interval = $interval;
         $this->maxExecutions = $maxExecutions;
         $this->executeAt = microtime(true) + $interval;
-    }
-
-    public function getId(): string
-    {
-        return $this->id;
-    }
-
-    public function getCallback(): callable
-    {
-        return $this->callback;
-    }
-
-    public function getExecuteAt(): float
-    {
-        return $this->executeAt;
-    }
-
-    public function getInterval(): float
-    {
-        return $this->interval;
     }
 
     public function isReady(float $currentTime): bool
@@ -60,7 +40,6 @@ final class PeriodicTimer
         $this->executionCount++;
         ($this->callback)();
 
-        // Schedule next execution if we should continue
         if ($this->shouldContinue()) {
             $this->executeAt = microtime(true) + $this->interval;
         }
@@ -69,24 +48,5 @@ final class PeriodicTimer
     public function shouldContinue(): bool
     {
         return $this->maxExecutions === null || $this->executionCount < $this->maxExecutions;
-    }
-
-    public function getExecutionCount(): int
-    {
-        return $this->executionCount;
-    }
-
-    public function getRemainingExecutions(): ?int
-    {
-        if ($this->maxExecutions === null) {
-            return null;
-        }
-
-        return max(0, $this->maxExecutions - $this->executionCount);
-    }
-
-    public function isPeriodic(): bool
-    {
-        return true;
     }
 }

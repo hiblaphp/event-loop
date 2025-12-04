@@ -6,30 +6,20 @@ namespace Hibla\EventLoop\ValueObjects;
 
 final class Timer
 {
-    private string $id;
+    public int $id;
 
     /**
      * @var callable
      */
-    private $callback;
+    public $callback;
+    
+    public float $executeAt;
 
-    private float $executeAt;
-
-    public function __construct(float $delay, callable $callback)
+    public function __construct(int $id, float $delay, callable $callback)
     {
-        $this->id = uniqid('timer_', true);
+        $this->id = $id;
         $this->callback = $callback;
         $this->executeAt = microtime(true) + $delay;
-    }
-
-    public function getId(): string
-    {
-        return $this->id;
-    }
-
-    public function getExecuteAt(): float
-    {
-        return $this->executeAt;
     }
 
     public function isReady(float $currentTime): bool
@@ -42,3 +32,4 @@ final class Timer
         ($this->callback)();
     }
 }
+

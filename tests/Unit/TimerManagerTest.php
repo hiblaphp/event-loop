@@ -79,40 +79,6 @@ describe('TimerManager', function () {
         expect($delay)->toBeLessThanOrEqual(0.1);
     });
 
-    it('provides timer statistics', function () {
-        $manager = new TimerManager();
-
-        $manager->addTimer(0.1, fn () => null);
-        $manager->addPeriodicTimer(0.1, fn () => null, 5);
-
-        $stats = $manager->getTimerStats();
-
-        expect($stats)->toHaveKeys([
-            'regular_timers',
-            'periodic_timers',
-            'total_timers',
-            'total_periodic_executions',
-        ]);
-
-        expect($stats['regular_timers'])->toBe(1);
-        expect($stats['periodic_timers'])->toBe(1);
-        expect($stats['total_timers'])->toBe(2);
-    });
-
-    it('provides individual timer info', function () {
-        $manager = new TimerManager();
-        $timerId = $manager->addTimer(0.1, fn () => null);
-
-        $info = $manager->getTimerInfo($timerId);
-
-        expect($info)->toBeArray();
-        expect($info)->toHaveKeys(['id', 'execute_at', 'is_ready', 'type']);
-        expect($info['type'])->toBe('regular');
-
-        // Non-existent timer
-        expect($manager->getTimerInfo('invalid'))->toBeNull();
-    });
-
     it('can clear all timers', function () {
         $manager = new TimerManager();
 
