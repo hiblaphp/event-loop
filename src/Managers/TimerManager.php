@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Managers;
 
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
-use Hibla\EventLoop\IOHandlers\Timer\TimerExecutionHandler;
-use Hibla\EventLoop\IOHandlers\Timer\TimerScheduleHandler;
 use Hibla\EventLoop\ValueObjects\PeriodicTimer;
 use Hibla\EventLoop\ValueObjects\Timer;
 use SplPriorityQueue;
@@ -23,22 +21,20 @@ final class TimerManager implements TimerManagerInterface
      */
     private SplPriorityQueue $timerQueue;
 
-    private readonly TimerExecutionHandler $executionHandler;
-    private readonly TimerScheduleHandler $scheduleHandler;
-
     private bool $queueNeedsRebuild = false;
 
     public function __construct()
     {
-        $this->executionHandler = new TimerExecutionHandler();
-        $this->scheduleHandler = new TimerScheduleHandler();
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
     }
 
+    /**
+     * @inheritDoc
+     */
     public function addTimer(float $delay, callable $callback): string
     {
-        $timer = $this->scheduleHandler->createTimer($delay, $callback);
+        $timer = new Timer($delay, $callback);
         $this->timers[$timer->getId()] = $timer;
 
         $this->timerQueue->insert($timer, (int)(-$timer->getExecuteAt() * 1000000));
@@ -46,6 +42,9 @@ final class TimerManager implements TimerManagerInterface
         return $timer->getId();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function addPeriodicTimer(float $interval, callable $callback, ?int $maxExecutions = null): string
     {
         $periodicTimer = new PeriodicTimer($interval, $callback, $maxExecutions);
@@ -56,6 +55,9 @@ final class TimerManager implements TimerManagerInterface
         return $periodicTimer->getId();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function cancelTimer(string $timerId): bool
     {
         if (isset($this->timers[$timerId])) {
@@ -75,9 +77,7 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * Check if there are any timers ready to execute now.
-     *
-     * @return bool True if at least one timer is ready
+     * @inheritDoc
      */
     public function hasReadyTimers(): bool
     {
@@ -112,6 +112,9 @@ final class TimerManager implements TimerManagerInterface
         return false;
     }
 
+    /**
+    * @inheritDoc
+     */
     public function processTimers(): bool
     {
         if ($this->queueNeedsRebuild) {
@@ -156,7 +159,7 @@ final class TimerManager implements TimerManagerInterface
                     unset($this->timers[$timer->getId()]);
                 }
             } else {
-                $this->executionHandler->executeTimer($timer);
+                $timer->execute();
                 unset($this->timers[$timer->getId()]);
             }
 
@@ -167,11 +170,17 @@ final class TimerManager implements TimerManagerInterface
         return false;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function hasTimers(): bool
     {
         return \count($this->timers) > 0;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function getNextTimerDelay(): ?float
     {
         if ($this->queueNeedsRebuild) {
@@ -205,6 +214,9 @@ final class TimerManager implements TimerManagerInterface
         return null;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function clearAllTimers(): void
     {
         $this->timers = [];

@@ -37,7 +37,7 @@ describe('EventLoop Stress Tests', function () {
         $fiberCount = 1000;
 
         for ($i = 0; $i < $fiberCount; $i++) {
-            $fiber = new Fiber(fn() => 'done');
+            $fiber = new Fiber(fn () => 'done');
             $loop->addFiber($fiber);
         }
 

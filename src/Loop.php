@@ -168,6 +168,16 @@ final class Loop
     }
 
     /**
+     * Schedules a fiber for processing, moving it from the ready queue to the active queue.
+     *
+     * @param  Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber to schedule
+     */
+    public static function scheduleFiber(Fiber $fiber): void
+    {
+        self::getInstance()->scheduleFiber($fiber);
+    }
+
+    /**
      * Schedule a callback to run on the next event loop tick.
      *
      * Next-tick callbacks have the highest priority and execute before

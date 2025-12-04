@@ -19,6 +19,9 @@ final class SignalManager implements SignalManagerInterface
      */
     private array $registeredSignals = [];
 
+    /**
+     * @inheritDoc
+     */
     public function addSignal(int $signal, callable $callback): string
     {
         if (! $this->isSignalSupported()) {
@@ -46,6 +49,9 @@ final class SignalManager implements SignalManagerInterface
         return $id;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function removeSignal(string $signalId): bool
     {
         foreach ($this->signals as $signal => $listeners) {
@@ -66,11 +72,17 @@ final class SignalManager implements SignalManagerInterface
         return false;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function hasSignals(): bool
     {
         return $this->signals !== [];
     }
 
+    /**
+     * @inheritDoc
+     */
     public function processSignals(): bool
     {
         if (! $this->hasSignals()) {
@@ -85,6 +97,9 @@ final class SignalManager implements SignalManagerInterface
         return true;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function clearAllSignals(): void
     {
         foreach (array_keys($this->registeredSignals) as $signal) {
@@ -95,6 +110,9 @@ final class SignalManager implements SignalManagerInterface
         $this->registeredSignals = [];
     }
 
+    /**
+     * @inheritDoc
+     */
     public function getListenerCount(int $signal): int
     {
         return isset($this->signals[$signal]) ? \count($this->signals[$signal]) : 0;
@@ -121,18 +139,7 @@ final class SignalManager implements SignalManagerInterface
         }
 
         foreach ($this->signals[$signal] as $signalObject) {
-            try {
-                $signalObject->invoke($signal);
-            } catch (\Throwable $e) {
-                // Log error but don't let one listener break others
-                trigger_error(
-                    \sprintf(
-                        'Uncaught exception in signal handler: %s',
-                        $e->getMessage()
-                    ),
-                    E_USER_WARNING
-                );
-            }
+            $signalObject->invoke($signal);
         }
     }
 

@@ -111,12 +111,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Register a listener to be notified when a signal has been caught.
-     *
-     * @param int $signal The signal number (e.g., SIGINT, SIGTERM)
-     * @param callable $callback Function to execute when signal is received
-     * @return string Unique identifier for this signal listener
-     * @throws \BadMethodCallException If signals are not supported
+     * @inheritDoc
      */
     public function addSignal(int $signal, callable $callback): string
     {
@@ -124,10 +119,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Remove a signal listener.
-     *
-     * @param string $signalId The signal listener ID returned by addSignal()
-     * @return bool True if listener was removed, false if not found
+     * @inheritDoc
      */
     public function removeSignal(string $signalId): bool
     {
@@ -135,11 +127,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedule a timer to execute a callback after a specified delay.
-     *
-     * @param  float  $delay  Delay in seconds before executing the callback
-     * @param  callable  $callback  Function to execute when timer expires
-     * @return string Unique identifier for the timer
+     * @inheritDoc
      */
     public function addTimer(float $delay, callable $callback): string
     {
@@ -147,12 +135,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedule a periodic timer that executes repeatedly at specified intervals.
-     *
-     * @param  float  $interval  Interval in seconds between executions
-     * @param  callable  $callback  Function to execute on each interval
-     * @param  int|null  $maxExecutions  Maximum number of executions (null for infinite)
-     * @return string Unique identifier for the periodic timer
+     * @inheritDoc
      */
     public function addPeriodicTimer(float $interval, callable $callback, ?int $maxExecutions = null): string
     {
@@ -165,10 +148,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Cancel a previously scheduled timer.
-     *
-     * @param  string  $timerId  The timer ID returned by addTimer()
-     * @return bool True if timer was cancelled, false if not found
+     * @inheritDoc
      */
     public function cancelTimer(string $timerId): bool
     {
@@ -176,12 +156,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedule an asynchronous HTTP request.
-     *
-     * @param  string  $url  The URL to request.
-     * @param  array<int, mixed>  $options  cURL options for the request, using CURLOPT_* constants as keys.
-     * @param  callable  $callback  Function to execute when request completes.
-     * @return string A unique ID for the request.
+     * @inheritDoc
      */
     public function addHttpRequest(string $url, array $options, callable $callback): string
     {
@@ -189,10 +164,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Cancel a previously scheduled HTTP request.
-     *
-     * @param  string  $requestId  The request ID returned by addHttpRequest()
-     * @return bool True if request was cancelled, false if not found
+     * @inheritDoc
      */
     public function cancelHttpRequest(string $requestId): bool
     {
@@ -200,25 +172,23 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Add a stream watcher for I/O operations.
-     *
-     * @param  resource  $stream  The stream resource to watch
-     * @param  callable  $callback  Function to execute when stream has data
+     * @inheritDoc
      */
     public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
         return $this->streamManager->addStreamWatcher($stream, $callback, $type);
     }
 
+    /**
+     * @inheritDoc
+     */
     public function removeStreamWatcher(string $watcherId): bool
     {
         return $this->streamManager->removeStreamWatcher($watcherId);
     }
 
     /**
-     * Add a fiber to be managed by the event loop.
-     *
-     * @param  Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber instance to add to the loop.
+     * @inheritDoc
      */
     public function addFiber(Fiber $fiber): void
     {
@@ -228,12 +198,17 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedule a callback to run on the next event loop tick.
-     *
-     * Next-tick callbacks have the highest priority and execute before
-     * any other work in the next loop iteration.
-     *
-     * @param  callable  $callback  Function to execute on next tick
+     * @inheritDoc
+     */
+    public function scheduleFiber(Fiber $fiber): void
+    {
+        /** @var Fiber<null, mixed, mixed, mixed> $compatibleFiber */
+        $compatibleFiber = $fiber;
+        $this->fiberManager->scheduleFiber($compatibleFiber);
+    }
+
+    /**
+     * @inheritDoc
      */
     public function nextTick(callable $callback): void
     {
@@ -241,12 +216,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Queue a microtask callback to run after nextTick but before timers.
-     *
-     * Microtasks are primarily used internally for Promise resolution callbacks or creating new microtasks.
-     * They run after all nextTick callbacks but before any timer or I/O operations.
-     *
-     * @param  callable  $callback  Function to execute as a microtask
+     * @inheritDoc
      */
     public function microTask(callable $callback): void
     {
@@ -254,11 +224,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedules a callback to run on the next check phase of the event loop.
-     *
-     * Check phase callbacks run after all nextTick and microtask callbacks.
-     *
-     * @param  callable  $callback  The callback to execute on next check phase
+     * @inheritDoc
      */
     public function setImmediate(callable $callback): void
     {
@@ -266,12 +232,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Schedule a callback to run after the current work phase.
-     *
-     * Deferred callbacks run after all immediate work is processed
-     * but before the loop sleeps or waits for events.
-     *
-     * @param  callable  $callback  Function to execute when deferred
+     * @inheritDoc
      */
     public function defer(callable $callback): void
     {
@@ -279,10 +240,7 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Start the main event loop execution.
-     *
-     * Continues processing work until the loop is stopped or no more
-     * work is available. Includes forced shutdown to prevent hanging.
+     * @inheritDoc
      */
     public function run(): void
     {
@@ -298,6 +256,77 @@ final class EventLoopFactory implements LoopInterface
         if (! $this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
             $this->handleGracefulShutdown();
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function forceStop(): void
+    {
+        self::$explicitlyStopped = true;
+        $this->forceShutdown();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isRunning(): bool
+    {
+        return $this->stateHandler->isRunning();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function stop(): void
+    {
+        self::$explicitlyStopped = true;
+        $this->stateHandler->stop();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isIdle(): bool
+    {
+        return ! $this->workHandler->hasWork() || $this->activityHandler->isIdle();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function addFileOperation(
+        string $type,
+        string $path,
+        mixed $data,
+        callable $callback,
+        array $options = []
+    ): string {
+        return $this->fileManager->addFileOperation($type, $path, $data, $callback, $options);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function cancelFileOperation(string $operationId): bool
+    {
+        return $this->fileManager->cancelFileOperation($operationId);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function addFileWatcher(string $path, callable $callback, array $options = []): string
+    {
+        return $this->fileManager->addFileWatcher($path, $callback, $options);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function removeFileWatcher(string $watcherId): bool
+    {
+        return $this->fileManager->removeFileWatcher($watcherId);
     }
 
     /**
@@ -348,93 +377,6 @@ final class EventLoopFactory implements LoopInterface
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
         $this->signalManager->clearAllSignals();
-    }
-
-    /**
-     * Force immediate stop of the event loop.
-     *
-     * This bypasses graceful shutdown and immediately clears all work.
-     */
-    public function forceStop(): void
-    {
-        self::$explicitlyStopped = true;
-        $this->forceShutdown();
-    }
-
-    /**
-     * Check if the event loop is currently running.
-     *
-     * @return bool True if the loop is running, false otherwise
-     */
-    public function isRunning(): bool
-    {
-        return $this->stateHandler->isRunning();
-    }
-
-    /**
-     * Stop the event loop execution.
-     *
-     * Gracefully stops the event loop after the current iteration completes.
-     * The loop will exit when it next checks the running state.
-     */
-    public function stop(): void
-    {
-        self::$explicitlyStopped = true;
-        $this->stateHandler->stop();
-    }
-
-    /**
-     * Check if the event loop is currently idle.
-     *
-     * An idle loop has no pending work or has been inactive for an
-     * extended period. Useful for determining system load state.
-     *
-     * @return bool True if the loop is idle, false if actively processing
-     */
-    public function isIdle(): bool
-    {
-        return ! $this->workHandler->hasWork() || $this->activityHandler->isIdle();
-    }
-
-    /**
-     * Schedule an asynchronous file operation
-     *
-     * @param  array<string, mixed>  $options
-     */
-    public function addFileOperation(
-        string $type,
-        string $path,
-        mixed $data,
-        callable $callback,
-        array $options = []
-    ): string {
-        return $this->fileManager->addFileOperation($type, $path, $data, $callback, $options);
-    }
-
-    /**
-     * Cancel a file operation
-     */
-    public function cancelFileOperation(string $operationId): bool
-    {
-        return $this->fileManager->cancelFileOperation($operationId);
-    }
-
-    /**
-     * Add a file watcher
-     *
-     * @param  array<string, mixed>  $options
-     */
-    public function addFileWatcher(string $path, callable $callback, array $options = []): string
-    {
-        return $this->fileManager->addFileWatcher($path, $callback, $options);
-    }
-
-    /**
-     * Remove a file watcher
-     */
-    public function removeFileWatcher(string $watcherId): bool
-    {
-        return $this->fileManager->removeFileWatcher($watcherId);
     }
 
     /**

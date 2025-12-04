@@ -56,9 +56,6 @@ final class TickHandler
         $this->deferredCallbacks->enqueue($callback);
     }
 
-    /**
-     * @return bool True if any callbacks were processed
-     */
     public function processNextTickCallbacks(): bool
     {
         if ($this->tickCallbacks->isEmpty()) {
@@ -74,21 +71,13 @@ final class TickHandler
             }
 
             $callback = $this->tickCallbacks->dequeue();
-
-            try {
-                $callback();
-                $processed = true;
-            } catch (\Throwable $e) {
-                error_log('NextTick callback error: ' . $e->getMessage());
-            }
+            $callback();
+            $processed = true;
         }
 
         return $processed;
     }
 
-    /**
-     * @return bool True if any callbacks were processed
-     */
     public function processMicrotasks(int $maxIterations = 10000): bool
     {
         if ($this->microtaskCallbacks->isEmpty()) {
@@ -100,14 +89,9 @@ final class TickHandler
 
         while (! $this->microtaskCallbacks->isEmpty() && $iterations < $maxIterations) {
             $callback = $this->microtaskCallbacks->dequeue();
-
-            try {
-                $callback();
-                $processed = true;
-                $iterations++;
-            } catch (\Throwable $e) {
-                error_log('Microtask callback error: ' . $e->getMessage());
-            }
+            $callback();
+            $processed = true;
+            $iterations++;
         }
 
         if ($iterations >= $maxIterations && ! $this->microtaskCallbacks->isEmpty()) {
@@ -117,9 +101,6 @@ final class TickHandler
         return $processed;
     }
 
-    /**
-     * @return bool True if any callbacks were processed
-     */
     public function processImmediateCallbacks(): bool
     {
         if ($this->immediateCallbacks->isEmpty()) {
@@ -135,21 +116,13 @@ final class TickHandler
             }
 
             $callback = $this->immediateCallbacks->dequeue();
-
-            try {
-                $callback();
-                $processed = true;
-            } catch (\Throwable $e) {
-                error_log('Immediate callback error: ' . $e->getMessage());
-            }
+            $callback();
+            $processed = true;
         }
 
         return $processed;
     }
 
-    /**
-     * @return bool True if any callbacks were processed
-     */
     public function processDeferredCallbacks(): bool
     {
         if ($this->deferredCallbacks->isEmpty()) {
@@ -165,13 +138,8 @@ final class TickHandler
             }
 
             $callback = $this->deferredCallbacks->dequeue();
-
-            try {
-                $callback();
-                $processed = true;
-            } catch (\Throwable $e) {
-                error_log('Deferred callback error: ' . $e->getMessage());
-            }
+            $callback();
+            $processed = true;
         }
 
         return $processed;

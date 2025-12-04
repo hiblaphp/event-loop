@@ -15,17 +15,17 @@ final class HttpRequestManager implements HttpRequestManagerInterface
 {
     /**
      *  @var list<HttpRequest>
-    */
+     */
     private array $pendingRequests = [];
 
     /**
      * @var array<int, HttpRequest>
-    */
+     */
     private array $activeRequests = [];
 
     /**
      * @var array<string, HttpRequest>
-    */
+     */
     private array $requestsById = [];
 
     private readonly CurlMultiHandle $multiHandle;
@@ -42,9 +42,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     }
 
     /**
-     * @param  string  $url
-     * @param  array<int, mixed>  $options
-     * @param  callable  $callback
+     * @inheritDoc
      */
     public function addHttpRequest(string $url, array $options, callable $callback): string
     {
@@ -57,6 +55,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return $requestId;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function cancelHttpRequest(string $requestId): bool
     {
         if (! isset($this->requestsById[$requestId])) {
@@ -87,6 +88,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return true;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function processRequests(): bool
     {
         $workDone = false;
@@ -103,19 +107,8 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     }
 
     /**
-     * @return array<string, mixed>
+     * @inheritDoc
      */
-    public function getDebugInfo(): array
-    {
-        return [
-            'pending_count' => \count($this->pendingRequests),
-            'active_count' => \count($this->activeRequests),
-            'by_id_count' => \count($this->requestsById),
-            'active_handles' => array_keys($this->activeRequests),
-            'request_ids' => array_keys($this->requestsById),
-        ];
-    }
-
     public function clearAllRequests(): array
     {
         $pendingCount = \count($this->pendingRequests);
@@ -139,6 +132,9 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         return ['pending' => $pendingCount, 'active' => $activeCount];
     }
 
+    /**
+     * @inheritDoc
+     */
     public function clearPendingRequests(): int
     {
         $clearedCount = \count($this->pendingRequests);
@@ -157,6 +153,28 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         $this->pendingRequests = [];
 
         return $clearedCount;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function hasRequests(): bool
+    {
+        return \count($this->pendingRequests) > 0 || \count($this->activeRequests) > 0;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getDebugInfo(): array
+    {
+        return [
+            'pending_count' => \count($this->pendingRequests),
+            'active_count' => \count($this->activeRequests),
+            'by_id_count' => \count($this->requestsById),
+            'active_handles' => array_keys($this->activeRequests),
+            'request_ids' => array_keys($this->requestsById),
+        ];
     }
 
     private function addPendingRequests(): bool
@@ -193,11 +211,6 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         }
 
         return \count($completedRequests) > 0;
-    }
-
-    public function hasRequests(): bool
-    {
-        return \count($this->pendingRequests) > 0 || \count($this->activeRequests) > 0;
     }
 
     public function __destruct()

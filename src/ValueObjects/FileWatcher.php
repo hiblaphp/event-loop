@@ -153,10 +153,6 @@ final class FileWatcher
 
     public function executeCallback(string $event, string $path): void
     {
-        try {
-            ($this->callback)($event, $path);
-        } catch (\Throwable $e) {
-            error_log('File watcher callback error: ' . $e->getMessage());
-        }
+        ($this->callback)($event, $path);
     }
 }

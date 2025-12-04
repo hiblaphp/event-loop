@@ -123,6 +123,13 @@ interface LoopInterface
     public function addFiber(Fiber $fiber): void;
 
     /**
+     * Schedules a fiber for processing, moving it from the ready queue to the active queue.
+     *
+     * @param  Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber to schedule
+     */
+    public function scheduleFiber(Fiber $fiber): void;
+
+    /**
      * Schedules a callback to run on the next tick of the event loop.
      *
      * Next tick callbacks have higher priority than timers and I/O operations.

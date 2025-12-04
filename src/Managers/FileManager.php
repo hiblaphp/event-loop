@@ -44,12 +44,7 @@ final class FileManager implements FileManagerInterface
     }
 
     /**
-     * @param  string  $type
-     * @param  string  $path
-     * @param  mixed  $data
-     * @param  callable  $callback
-     * @param  array<string, mixed>  $options
-     * @return string The unique ID of the created operation.
+     * @inheritDoc
      */
     public function addFileOperation(
         string $type,
@@ -66,6 +61,9 @@ final class FileManager implements FileManagerInterface
         return $operation->getId();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function cancelFileOperation(string $operationId): bool
     {
         if (! isset($this->operationsById[$operationId])) {
@@ -86,16 +84,8 @@ final class FileManager implements FileManagerInterface
         return true;
     }
 
-    private function removeCompletedOperation(string $operationId): void
-    {
-        unset($this->operationsById[$operationId]);
-    }
-
     /**
-     * @param  string  $path
-     * @param  callable  $callback
-     * @param  array<string, mixed>  $options
-     * @return string
+     * @inheritDoc
      */
     public function addFileWatcher(string $path, callable $callback, array $options = []): string
     {
@@ -108,6 +98,9 @@ final class FileManager implements FileManagerInterface
         return $watcher->getId();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function removeFileWatcher(string $watcherId): bool
     {
         if (! isset($this->watchersById[$watcherId])) {
@@ -120,6 +113,9 @@ final class FileManager implements FileManagerInterface
         return $this->watcherHandler->removeWatcher($this->watchers, $watcherId);
     }
 
+    /**
+     * @inheritDoc
+     */
     public function processFileOperations(): bool
     {
         $workDone = false;
@@ -164,12 +160,9 @@ final class FileManager implements FileManagerInterface
         return $processed;
     }
 
-    private function processFileWatchers(): bool
-    {
-        // The watchers array is passed by reference and may be modified by the handler.
-        return $this->watcherHandler->processWatchers($this->watchers);
-    }
-
+    /**
+     * @inheritDoc
+     */
     public function hasWork(): bool
     {
         return \count($this->pendingOperations) > 0
@@ -177,16 +170,9 @@ final class FileManager implements FileManagerInterface
             || \count($this->watchers) > 0;
     }
 
-    public function hasPendingOperations(): bool
-    {
-        return \count($this->pendingOperations) > 0 || \count($this->operationsById) > 0;
-    }
-
-    public function hasWatchers(): bool
-    {
-        return \count($this->watchers) > 0;
-    }
-
+    /**
+     * @inheritDoc
+     */
     public function clearAllOperations(): void
     {
         foreach ($this->pendingOperations as $operation) {
@@ -201,5 +187,25 @@ final class FileManager implements FileManagerInterface
         $this->operationsById = [];
         $this->watchers = [];
         $this->watchersById = [];
+    }
+
+    public function hasPendingOperations(): bool
+    {
+        return \count($this->pendingOperations) > 0 || \count($this->operationsById) > 0;
+    }
+
+    public function hasWatchers(): bool
+    {
+        return \count($this->watchers) > 0;
+    }
+
+    private function removeCompletedOperation(string $operationId): void
+    {
+        unset($this->operationsById[$operationId]);
+    }
+
+    private function processFileWatchers(): bool
+    {
+        return $this->watcherHandler->processWatchers($this->watchers);
     }
 }

@@ -84,7 +84,7 @@ describe('TickHandler', function () {
         expect($order)->toBe(['tick1', 'tick2', 'tick3']);
     });
 
-    it('handles nextTick callback exceptions gracefully', function () {
+    it('propagates nextTick callback exceptions', function () {
         $handler = new TickHandler();
         $executed = false;
 
@@ -96,12 +96,14 @@ describe('TickHandler', function () {
             $executed = true;
         });
 
-        $processed = $handler->processNextTickCallbacks();
-        expect($processed)->toBeTrue();
-        expect($executed)->toBeTrue();
+        expect(fn () => $handler->processNextTickCallbacks())
+            ->toThrow(Exception::class, 'Test exception')
+        ;
+
+        expect($executed)->toBeFalse();
     });
 
-    it('handles microtask callback exceptions gracefully', function () {
+    it('propagates microtask callback exceptions', function () {
         $handler = new TickHandler();
         $executed = false;
 
@@ -113,12 +115,14 @@ describe('TickHandler', function () {
             $executed = true;
         });
 
-        $processed = $handler->processMicrotasks();
-        expect($processed)->toBeTrue();
-        expect($executed)->toBeTrue();
+        expect(fn () => $handler->processMicrotasks())
+            ->toThrow(Exception::class, 'Microtask exception')
+        ;
+
+        expect($executed)->toBeFalse();
     });
 
-    it('handles deferred callback exceptions gracefully', function () {
+    it('propagates deferred callback exceptions', function () {
         $handler = new TickHandler();
         $executed = false;
 
@@ -130,8 +134,33 @@ describe('TickHandler', function () {
             $executed = true;
         });
 
-        $processed = $handler->processDeferredCallbacks();
-        expect($processed)->toBeTrue();
+        expect(fn () => $handler->processDeferredCallbacks())
+            ->toThrow(Exception::class, 'Deferred exception')
+        ;
+
+        expect($executed)->toBeFalse();
+    });
+
+    it('allows developers to handle exceptions with try-catch', function () {
+        $handler = new TickHandler();
+        $executed = false;
+        $exceptionCaught = false;
+
+        $handler->addNextTick(function () use (&$exceptionCaught) {
+            try {
+                throw new Exception('Handled exception');
+            } catch (Exception $e) {
+                $exceptionCaught = true;
+            }
+        });
+
+        $handler->addNextTick(function () use (&$executed) {
+            $executed = true;
+        });
+
+        $handler->processNextTickCallbacks();
+
+        expect($exceptionCaught)->toBeTrue();
         expect($executed)->toBeTrue();
     });
 
@@ -217,10 +246,8 @@ describe('TickHandler', function () {
 
         $handler->addMicrotask($addRecursive);
 
-        // With draining behavior, all microtasks are processed in one call
         $handler->processMicrotasks();
 
-        // All 3 microtasks should have executed (draining behavior)
         expect($count)->toBe(3);
         expect($handler->hasMicrotaskCallbacks())->toBeFalse();
     });

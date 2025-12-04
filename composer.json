@@ -23,7 +23,7 @@
         "ext-curl": "*"
     },
     "require-dev": {
-        "pestphp/pest": "^3.0",
+        "pestphp/pest": "^4.0",
         "revolt/event-loop": "^1.0",
         "phpstan/phpstan": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",

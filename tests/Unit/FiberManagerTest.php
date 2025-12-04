@@ -56,6 +56,64 @@ describe('FiberManager', function () {
         expect($fiber->isTerminated())->toBeTrue();
     });
 
+    it('can schedule a fiber', function () {
+        $manager = new FiberManager();
+        $executed = false;
+
+        $fiber = new Fiber(function () use (&$executed) {
+            $executed = true;
+
+            return 'scheduled';
+        });
+
+        $fiber->start();
+        expect($fiber->isTerminated())->toBeTrue();
+        expect($executed)->toBeTrue();
+
+        // Schedule it (should not add terminated fiber)
+        $manager->scheduleFiber($fiber);
+        expect($manager->hasFibers())->toBeFalse();
+        expect($manager->hasActiveFibers())->toBeFalse();
+    });
+
+    it('can schedule a suspended fiber', function () {
+        $manager = new FiberManager();
+        $step = 0;
+
+        $fiber = new Fiber(function () use (&$step) {
+            $step = 1;
+            Fiber::suspend();
+            $step = 2;
+        });
+
+        $fiber->start();
+        expect($fiber->isSuspended())->toBeTrue();
+        expect($step)->toBe(1);
+
+        $manager->scheduleFiber($fiber);
+        expect($manager->hasActiveFibers())->toBeTrue();
+
+        $processed = $manager->processFibers();
+        expect($processed)->toBeTrue();
+        expect($step)->toBe(2);
+        expect($fiber->isTerminated())->toBeTrue();
+    });
+
+    it('schedules fiber without incrementing active count', function () {
+        $manager = new FiberManager();
+
+        $fiber = new Fiber(function () {
+            Fiber::suspend();
+        });
+
+        $fiber->start();
+
+        $manager->scheduleFiber($fiber);
+        expect($manager->hasActiveFibers())->toBeTrue();
+
+        expect($manager->hasFibers())->toBeFalse();
+    });
+
     it('can prepare for shutdown', function () {
         $manager = new FiberManager();
 
@@ -92,25 +150,50 @@ describe('FiberManager', function () {
         $manager = new FiberManager();
         $order = [];
 
-        // Add a suspended fiber first
         $suspendedFiber = new Fiber(function () use (&$order) {
             $order[] = 'suspended_start';
             Fiber::suspend();
             $order[] = 'suspended_resume';
         });
         $manager->addFiber($suspendedFiber);
-        $manager->processFibers(); // This will start and suspend it
+        $manager->processFibers();
 
-        // Add a new fiber
         $newFiber = new Fiber(function () use (&$order) {
             $order[] = 'new_fiber';
         });
         $manager->addFiber($newFiber);
 
-        // Process should handle new fiber first
         $manager->processFibers();
 
         expect($order)->toContain('new_fiber');
         expect(array_search('new_fiber', $order))->toBeLessThan(array_search('suspended_resume', $order) ?: PHP_INT_MAX);
+    });
+
+    it('handles scheduling during fiber execution', function () {
+        $manager = new FiberManager();
+        $order = [];
+
+        $fiber1 = new Fiber(function () use (&$order, $manager) {
+            $order[] = 'fiber1_start';
+
+            $fiber2 = new Fiber(function () use (&$order) {
+                $order[] = 'fiber2_executed';
+            });
+            $fiber2->start();
+            $manager->scheduleFiber($fiber2);
+
+            $order[] = 'fiber1_end';
+        });
+
+        $manager->addFiber($fiber1);
+        $manager->processFibers();
+
+        // fiber2 should be scheduled but not executed yet
+        expect($order)->toBe(['fiber1_start', 'fiber2_executed', 'fiber1_end']);
+
+        // Process again to handle scheduled fiber
+        $manager->processFibers();
+
+        expect($manager->hasFibers())->toBeFalse();
     });
 });

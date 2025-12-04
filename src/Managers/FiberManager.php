@@ -6,130 +6,140 @@ namespace Hibla\EventLoop\Managers;
 
 use Fiber;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\IOHandlers\Fiber\FiberResumeHandler;
-use Hibla\EventLoop\IOHandlers\Fiber\FiberStartHandler;
-use Hibla\EventLoop\IOHandlers\Fiber\FiberStateHandler;
+use SplQueue;
 
 final class FiberManager implements FiberManagerInterface
 {
     /**
-     * @var array<int, Fiber<mixed, mixed, mixed, mixed>>
-    */
-    private array $fibers = [];
+     * @var SplQueue<Fiber<null, mixed, mixed, mixed>>
+     */
+    private SplQueue $readyQueue;
 
     /**
-     * @var array<int, Fiber<mixed, mixed, mixed, mixed>>
-    */
-    private array $suspendedFibers = [];
+     * @var SplQueue<Fiber<null, mixed, mixed, mixed>>
+     */
+    private SplQueue $suspendedQueue;
+
+    private int $activeFiberCount = 0;
 
     private bool $acceptingNewFibers = true;
 
-    private readonly FiberStartHandler $startHandler;
-    private readonly FiberResumeHandler $resumeHandler;
-    private readonly FiberStateHandler $stateHandler;
-
     public function __construct()
     {
-        $this->startHandler = new FiberStartHandler();
-        $this->resumeHandler = new FiberResumeHandler();
-        $this->stateHandler = new FiberStateHandler();
+        $this->readyQueue = new SplQueue();
+        $this->suspendedQueue = new SplQueue();
     }
 
     /**
-     * @param  Fiber<null, mixed, mixed, mixed>  $fiber  The fiber to add.
+     * @inheritdoc
      */
     public function addFiber(Fiber $fiber): void
     {
-        if (! ($this->acceptingNewFibers ?? true)) {
+        if (! $this->acceptingNewFibers || $fiber->isTerminated()) {
             return;
         }
 
-        $this->fibers[] = $fiber;
+        $this->readyQueue->enqueue($fiber);
+        $this->activeFiberCount++;
     }
 
+    /**
+     * @inheritdoc
+     */
+    public function scheduleFiber(Fiber $fiber): void
+    {
+        if ($fiber->isTerminated()) {
+            $this->activeFiberCount--;
+
+            return;
+        }
+
+        $this->readyQueue->enqueue($fiber);
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function processFibers(): bool
     {
-        if (\count($this->fibers) === 0 && \count($this->suspendedFibers) === 0) {
+        $this->moveAllSuspendedToReady();
+
+        if ($this->readyQueue->isEmpty()) {
             return false;
         }
 
-        $processed = false;
+        $processedCount = 0;
 
-        // Prioritize starting new fibers first.
-        if (\count($this->fibers) > 0) {
-            $processed = $this->processNewFibers();
-        } elseif (\count($this->suspendedFibers) > 0) {
-            $processed = $this->processSuspendedFibers();
-        }
+        $batchSize = $this->readyQueue->count();
 
-        return $processed;
-    }
-
-    private function processNewFibers(): bool
-    {
-        $fibersToStart = $this->fibers;
-        $this->fibers = [];
-        $processed = false;
-
-        foreach ($fibersToStart as $fiber) {
-            if ($this->startHandler->canStart($fiber)) {
-                if ($this->startHandler->startFiber($fiber)) {
-                    $processed = true;
-                }
-
+        while ($batchSize-- > 0) {
+            $fiber = $this->readyQueue->dequeue();
+            if ($fiber->isStarted()) {
                 if ($fiber->isSuspended()) {
-                    $this->suspendedFibers[] = $fiber;
+                    $fiber->resume();
                 }
+            } else {
+                $fiber->start();
+            }
+
+            $processedCount++;
+
+            if ($fiber->isSuspended()) {
+                $this->suspendedQueue->enqueue($fiber);
+            } elseif ($fiber->isTerminated()) {
+                $this->activeFiberCount--;
             }
         }
 
-        return $processed;
+        return $processedCount > 0;
     }
 
-    private function processSuspendedFibers(): bool
-    {
-        $fibersToResume = $this->suspendedFibers;
-        $this->suspendedFibers = [];
-        $processed = false;
-
-        foreach ($fibersToResume as $fiber) {
-            if ($this->resumeHandler->canResume($fiber)) {
-                if ($this->resumeHandler->resumeFiber($fiber)) {
-                    $processed = true;
-                }
-
-                if ($fiber->isSuspended()) {
-                    $this->suspendedFibers[] = $fiber;
-                }
-            }
-        }
-
-        return $processed;
-    }
-
+    /**
+     * @inheritdoc
+     */
     public function hasFibers(): bool
     {
-        return \count($this->fibers) > 0 || \count($this->suspendedFibers) > 0;
+        return $this->activeFiberCount > 0;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function hasActiveFibers(): bool
     {
-        return $this->stateHandler->hasActiveFibers($this->suspendedFibers) || count($this->fibers) > 0;
+        return ! $this->readyQueue->isEmpty() || ! $this->suspendedQueue->isEmpty();
     }
 
+    /**
+     * @inheritdoc
+     */
     public function clearFibers(): void
     {
-        $this->fibers = [];
-        $this->suspendedFibers = [];
+        $this->readyQueue = new SplQueue();
+        $this->suspendedQueue = new SplQueue();
+        $this->activeFiberCount = 0;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function prepareForShutdown(): void
     {
         $this->acceptingNewFibers = false;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function isAcceptingNewFibers(): bool
     {
-        return $this->acceptingNewFibers ?? true;
+        return $this->acceptingNewFibers;
+    }
+
+    private function moveAllSuspendedToReady(): void
+    {
+        while (! $this->suspendedQueue->isEmpty()) {
+            $this->readyQueue->enqueue($this->suspendedQueue->dequeue());
+        }
     }
 }

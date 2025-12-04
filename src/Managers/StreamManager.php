@@ -26,10 +26,7 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * @param  resource  $stream
-     * @param  callable  $callback
-     * @param  string  $type
-     * @return string
+     * @inheritDoc
      */
     public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
@@ -39,6 +36,9 @@ final class StreamManager implements StreamManagerInterface
         return $watcher->getId();
     }
 
+    /**
+     * @inheritDoc
+     */
     public function removeStreamWatcher(string $watcherId): bool
     {
         if (isset($this->watchers[$watcherId])) {
@@ -50,6 +50,9 @@ final class StreamManager implements StreamManagerInterface
         return false;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function processStreams(): bool
     {
         if (\count($this->watchers) === 0) {
@@ -67,11 +70,17 @@ final class StreamManager implements StreamManagerInterface
         return false;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function hasWatchers(): bool
     {
         return \count($this->watchers) > 0;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function clearAllWatchers(): void
     {
         $this->watchers = [];

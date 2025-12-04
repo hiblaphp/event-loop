@@ -19,6 +19,13 @@ interface FiberManagerInterface
     public function addFiber(Fiber $fiber): void;
 
     /**
+     * Schedules a fiber for processing, moving it from the ready queue to the active queue.
+     *
+     * @param  Fiber<null, mixed, mixed, mixed>  $fiber  The fiber to schedule
+     */
+    public function scheduleFiber(Fiber $fiber): void;
+
+    /**
      * Processes one batch of new or suspended fibers.
      *
      * @return bool True if any fiber was processed, false otherwise
