@@ -93,8 +93,7 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->httpRequestManager->hasRequests()
             || $this->fileManager->hasWork()
             || $this->streamManager->hasWatchers()
-            || $this->fiberManager->hasFibers()
-            || $this->signalManager->hasSignals();
+            || $this->fiberManager->hasFibers();
 
         if (! $hasPendingWork && $this->tickHandler->hasDeferredCallbacks()) {
             if ($this->tickHandler->processDeferredCallbacks()) {
