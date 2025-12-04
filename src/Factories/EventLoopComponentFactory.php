@@ -44,9 +44,12 @@ final class EventLoopComponentFactory
 
     public static function createSleepHandler(
         TimerManagerInterface $timerManager,
-        FiberManagerInterface $fiberManager
+        FiberManagerInterface $fiberManager,
+        HttpRequestManagerInterface $httpRequestManager,
+        StreamManagerInterface $streamManager,
+        FileManagerInterface $fileManager,
     ): SleepHandlerInterface {
-        return new SleepHandler($timerManager, $fiberManager);
+        return new SleepHandler($timerManager, $fiberManager, $httpRequestManager, $streamManager, $fileManager);
     }
 
     public static function createTimerManager(): TimerManagerInterface

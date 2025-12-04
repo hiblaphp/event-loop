@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Handlers;
 
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
+use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
+use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 
 final class SleepHandler implements SleepHandlerInterface
@@ -16,7 +19,10 @@ final class SleepHandler implements SleepHandlerInterface
 
     public function __construct(
         private TimerManagerInterface $timerManager,
-        private FiberManagerInterface $fiberManager
+        private FiberManagerInterface $fiberManager,
+        private HttpRequestManagerInterface $httpRequestManager,
+        private StreamManagerInterface $streamManager,
+        private FileManagerInterface $fileManager,
     ) {
     }
 
@@ -30,8 +36,16 @@ final class SleepHandler implements SleepHandlerInterface
             return false;
         }
 
+        $hasWaitingIO = $this->httpRequestManager->hasRequests()
+            || $this->streamManager->hasWatchers()
+            || $this->fileManager->hasWork();
+
+        if ($hasWaitingIO) {
+            return false;
+        }
+
         if ($this->fiberManager->hasActiveFibers()) {
-            return true;
+            return false;
         }
 
         return true;
@@ -40,18 +54,21 @@ final class SleepHandler implements SleepHandlerInterface
     public function calculateOptimalSleep(): int
     {
         $nextTimerDelay = $this->timerManager->getNextTimerDelay();
+        $maxSleep = self::IS_WINDOWS ? self::WINDOWS_MAX_SLEEP_US : self::UNIX_MAX_SLEEP_US;
 
         if ($nextTimerDelay === null) {
-            return self::IS_WINDOWS ? self::WINDOWS_MAX_SLEEP_US : self::UNIX_MAX_SLEEP_US;
+            return $maxSleep;
         }
 
         $delayUs = (int)($nextTimerDelay * 1_000_000);
 
-        if (self::IS_WINDOWS) {
-            return min($delayUs, self::WINDOWS_MAX_SLEEP_US);
-        }
+        $bufferDelayUs = (int)($delayUs * 0.9);
 
-        return min($delayUs, self::UNIX_MAX_SLEEP_US);
+
+        return min(
+            max($bufferDelayUs, 100),
+            $maxSleep
+        );
     }
 
     public function sleep(int $microseconds): void

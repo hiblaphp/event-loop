@@ -77,7 +77,10 @@ final class EventLoopFactory implements LoopInterface
 
         $this->sleepHandler = EventLoopComponentFactory::createSleepHandler(
             timerManager: $this->timerManager,
-            fiberManager: $this->fiberManager
+            fiberManager: $this->fiberManager,
+            httpRequestManager: $this->httpRequestManager,
+            streamManager: $this->streamManager,
+            fileManager: $this->fileManager,
         );
 
         $this->registerAutoRun();
