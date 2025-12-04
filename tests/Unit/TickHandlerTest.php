@@ -300,21 +300,4 @@ describe('TickHandler', function () {
         expect($count)->toBe($total);
         expect($handler->hasMicrotaskCallbacks())->toBeFalse();
     });
-
-    it('prevents infinite microtask loops with safety limit', function () {
-        $handler = new TickHandler();
-        $count = 0;
-
-        $infiniteRecursive = function () use (&$count, &$handler, &$infiniteRecursive) {
-            $count++;
-            $handler->addMicrotask($infiniteRecursive);
-        };
-
-        $handler->addMicrotask($infiniteRecursive);
-
-        $handler->processMicrotasks(100);
-
-        expect($count)->toBe(100);
-        expect($handler->hasMicrotaskCallbacks())->toBeTrue();
-    });
 });

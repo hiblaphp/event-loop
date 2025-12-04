@@ -78,24 +78,18 @@ final class TickHandler
         return $processed;
     }
 
-    public function processMicrotasks(int $maxIterations = 10000): bool
+    public function processMicrotasks(): bool
     {
         if ($this->microtaskCallbacks->isEmpty()) {
             return false;
         }
 
         $processed = false;
-        $iterations = 0;
 
-        while (! $this->microtaskCallbacks->isEmpty() && $iterations < $maxIterations) {
+        while (! $this->microtaskCallbacks->isEmpty()) {
             $callback = $this->microtaskCallbacks->dequeue();
             $callback();
             $processed = true;
-            $iterations++;
-        }
-
-        if ($iterations >= $maxIterations && ! $this->microtaskCallbacks->isEmpty()) {
-            error_log("Warning: Microtask queue exceeded max iterations ($maxIterations). Possible infinite loop detected.");
         }
 
         return $processed;
