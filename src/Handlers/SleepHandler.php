@@ -10,42 +10,62 @@ use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 
 final class SleepHandler implements SleepHandlerInterface
 {
-    protected const int MIN_SLEEP_THRESHOLD = 50;
+    private const int WINDOWS_MAX_SLEEP_US = 1000;
+    private const int UNIX_MAX_SLEEP_US = 10000;
+    private const bool IS_WINDOWS = PHP_OS_FAMILY === 'Windows';
 
-    protected const int MAX_SLEEP_DURATION = 500;
-
-    public function __construct(protected TimerManagerInterface $timerManager, protected FiberManagerInterface $fiberManager)
-    {
+    public function __construct(
+        private TimerManagerInterface $timerManager,
+        private FiberManagerInterface $fiberManager
+    ) {
     }
 
     public function shouldSleep(bool $hasImmediateWork): bool
     {
-        return ! $hasImmediateWork && ! $this->fiberManager->hasActiveFibers();
+        if ($hasImmediateWork) {
+            return false;
+        }
+
+        if ($this->timerManager->hasReadyTimers()) {
+            return false;
+        }
+
+        if ($this->fiberManager->hasActiveFibers()) {
+            return true;
+        }
+
+        return true;
     }
 
     public function calculateOptimalSleep(): int
     {
-        $nextTimerSeconds = $this->timerManager->getNextTimerDelay();
+        $nextTimerDelay = $this->timerManager->getNextTimerDelay();
 
-        if ($nextTimerSeconds !== null) {
-            $sleepMicros = (int) ($nextTimerSeconds * 1_000_000);
-
-            // Skip very short sleeps to avoid system call overhead
-            if ($sleepMicros < self::MIN_SLEEP_THRESHOLD) {
-                return 0;
-            }
-
-            return min(self::MAX_SLEEP_DURATION, $sleepMicros);
+        if ($nextTimerDelay === null) {
+            return self::IS_WINDOWS ? self::WINDOWS_MAX_SLEEP_US : self::UNIX_MAX_SLEEP_US;
         }
 
-        // No timers scheduled: use minimum threshold
-        return self::MIN_SLEEP_THRESHOLD;
+        $delayUs = (int)($nextTimerDelay * 1_000_000);
+
+        if (self::IS_WINDOWS) {
+            return min($delayUs, self::WINDOWS_MAX_SLEEP_US);
+        }
+
+        return min($delayUs, self::UNIX_MAX_SLEEP_US);
     }
 
     public function sleep(int $microseconds): void
     {
-        if ($microseconds >= self::MIN_SLEEP_THRESHOLD) {
-            usleep($microseconds);
+        if ($microseconds <= 0) {
+            return;
         }
+
+        if (self::IS_WINDOWS) {
+            usleep(min($microseconds, self::WINDOWS_MAX_SLEEP_US));
+
+            return;
+        }
+
+        usleep($microseconds);
     }
 }

@@ -6,6 +6,7 @@ namespace Hibla\EventLoop\Managers;
 
 use Fiber;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
+use SplObjectStorage;
 use SplQueue;
 
 final class FiberManager implements FiberManagerInterface
@@ -16,9 +17,9 @@ final class FiberManager implements FiberManagerInterface
     private SplQueue $readyQueue;
 
     /**
-     * @var SplQueue<Fiber<null, mixed, mixed, mixed>>
+     * @var SplObjectStorage<Fiber<null, mixed, mixed, mixed>, null>
      */
-    private SplQueue $suspendedQueue;
+    private SplObjectStorage $suspendedFibers;
 
     private int $activeFiberCount = 0;
 
@@ -27,7 +28,7 @@ final class FiberManager implements FiberManagerInterface
     public function __construct()
     {
         $this->readyQueue = new SplQueue();
-        $this->suspendedQueue = new SplQueue();
+        $this->suspendedFibers = new SplObjectStorage();
     }
 
     /**
@@ -51,10 +52,18 @@ final class FiberManager implements FiberManagerInterface
         if ($fiber->isTerminated()) {
             $this->activeFiberCount--;
 
+            if ($this->suspendedFibers->contains($fiber)) {
+                $this->suspendedFibers->detach($fiber);
+            }
+
             return;
         }
 
-        $this->readyQueue->enqueue($fiber);
+        // Only schedule if it's actually suspended
+        if ($this->suspendedFibers->contains($fiber)) {
+            $this->suspendedFibers->detach($fiber);
+            $this->readyQueue->enqueue($fiber);
+        }
     }
 
     /**
@@ -62,32 +71,47 @@ final class FiberManager implements FiberManagerInterface
      */
     public function processFibers(): bool
     {
-        $this->moveAllSuspendedToReady();
+        // CRITICAL:= // Fibers should only be resumed when explicitly scheduled via scheduleFiber()
 
         if ($this->readyQueue->isEmpty()) {
             return false;
         }
 
         $processedCount = 0;
-
         $batchSize = $this->readyQueue->count();
 
-        while ($batchSize-- > 0) {
+        while ($batchSize-- > 0 && ! $this->readyQueue->isEmpty()) {
             $fiber = $this->readyQueue->dequeue();
-            if ($fiber->isStarted()) {
-                if ($fiber->isSuspended()) {
+
+            try {
+                if (! $fiber->isStarted()) {
+                    $fiber->start();
+                } elseif ($fiber->isSuspended()) {
                     $fiber->resume();
+                } else {
+                    continue;
                 }
-            } else {
-                $fiber->start();
-            }
 
-            $processedCount++;
+                $processedCount++;
 
-            if ($fiber->isSuspended()) {
-                $this->suspendedQueue->enqueue($fiber);
-            } elseif ($fiber->isTerminated()) {
+                if ($fiber->isSuspended()) {
+                    // Track suspended fibers - they'll only be resumed when explicitly scheduled
+                    $this->suspendedFibers->attach($fiber);
+                } elseif ($fiber->isTerminated()) {
+                    $this->activeFiberCount--;
+
+                    if ($this->suspendedFibers->contains($fiber)) {
+                        $this->suspendedFibers->detach($fiber);
+                    }
+                }
+            } catch (\Throwable $e) {
                 $this->activeFiberCount--;
+
+                if ($this->suspendedFibers->contains($fiber)) {
+                    $this->suspendedFibers->detach($fiber);
+                }
+
+                throw $e;
             }
         }
 
@@ -107,7 +131,7 @@ final class FiberManager implements FiberManagerInterface
      */
     public function hasActiveFibers(): bool
     {
-        return ! $this->readyQueue->isEmpty() || ! $this->suspendedQueue->isEmpty();
+        return ! $this->readyQueue->isEmpty() || $this->suspendedFibers->count() > 0;
     }
 
     /**
@@ -116,7 +140,7 @@ final class FiberManager implements FiberManagerInterface
     public function clearFibers(): void
     {
         $this->readyQueue = new SplQueue();
-        $this->suspendedQueue = new SplQueue();
+        $this->suspendedFibers = new SplObjectStorage();
         $this->activeFiberCount = 0;
     }
 
@@ -134,12 +158,5 @@ final class FiberManager implements FiberManagerInterface
     public function isAcceptingNewFibers(): bool
     {
         return $this->acceptingNewFibers;
-    }
-
-    private function moveAllSuspendedToReady(): void
-    {
-        while (! $this->suspendedQueue->isEmpty()) {
-            $this->readyQueue->enqueue($this->suspendedQueue->dequeue());
-        }
     }
 }
