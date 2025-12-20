@@ -9,8 +9,8 @@ describe('ActivityHandler', function () {
         $handler = new ActivityHandler();
         $lastActivity = $handler->getLastActivity();
 
-        expect($lastActivity)->toBeValidTimestamp();
-        expect($lastActivity)->toBeLessThanOrEqual(microtime(true));
+        expect($lastActivity)->toBeInt();
+        expect($lastActivity)->toBeGreaterThan(0);
     });
 
     it('updates activity timestamp', function () {
@@ -46,7 +46,7 @@ describe('ActivityHandler', function () {
         $handler->updateLastActivity();
 
         $stats = $handler->getActivityStats();
-        expect($stats['avg_interval'])->toBeGreaterThan(0);
+        expect($stats['avg_interval_ns'])->toBeGreaterThan(0);
     });
 
     it('detects idle state correctly', function () {
@@ -58,15 +58,41 @@ describe('ActivityHandler', function () {
         expect($handler->isIdle())->toBeFalse();
     });
 
+    it('detects idle state after threshold', function () {
+        $handler = new ActivityHandler();
+        $handler->updateLastActivity();
+
+        // Sleep longer than the idle threshold (5 seconds)
+        sleep(6);
+
+        expect($handler->isIdle())->toBeTrue();
+    });
+
     it('provides comprehensive activity stats', function () {
         $handler = new ActivityHandler();
         $handler->updateLastActivity();
 
         $stats = $handler->getActivityStats();
 
-        expect($stats)->toHaveKeys(['counter', 'avg_interval', 'idle_time']);
+        expect($stats)->toHaveKeys(['counter', 'avg_interval_ns', 'idle_time_ns']);
         expect($stats['counter'])->toBeInt();
-        expect($stats['avg_interval'])->toBeFloat();
-        expect($stats['idle_time'])->toBeFloat();
+        expect($stats['avg_interval_ns'])->toBeInt();
+        expect($stats['idle_time_ns'])->toBeInt();
+    });
+
+    it('calculates adaptive threshold based on activity', function () {
+        $handler = new ActivityHandler();
+
+        // Perform 101 updates to exceed the 100 count threshold
+        for ($i = 0; $i < 101; $i++) {
+            $handler->updateLastActivity();
+            usleep(1000);
+        }
+
+        $stats = $handler->getActivityStats();
+        expect($stats['counter'])->toBe(101);
+
+        // Average interval should be around 1ms = 1,000,000 ns
+        expect($stats['avg_interval_ns'])->toBeGreaterThan(800_000);
     });
 });

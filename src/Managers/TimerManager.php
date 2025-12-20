@@ -21,8 +21,6 @@ final class TimerManager implements TimerManagerInterface
      */
     private SplPriorityQueue $timerQueue;
 
-    private bool $queueNeedsRebuild = false;
-    
     private int $nextId = 0;
 
     public function __construct()
@@ -40,7 +38,7 @@ final class TimerManager implements TimerManagerInterface
         $timer = new Timer($id, $delay, $callback);
         $this->timers[$id] = $timer;
 
-        $this->timerQueue->insert($id, (int)(-$timer->executeAt * 1000000));
+        $this->timerQueue->insert($id, -$timer->executeAt);
 
         return (string)$id;
     }
@@ -54,7 +52,7 @@ final class TimerManager implements TimerManagerInterface
         $periodicTimer = new PeriodicTimer($id, $interval, $callback, $maxExecutions);
         $this->timers[$id] = $periodicTimer;
 
-        $this->timerQueue->insert($id, (int)(-$periodicTimer->executeAt * 1000000));
+        $this->timerQueue->insert($id, -$periodicTimer->executeAt);
 
         return (string)$id;
     }
@@ -65,16 +63,15 @@ final class TimerManager implements TimerManagerInterface
     public function cancelTimer(string $timerId): bool
     {
         $id = (int)$timerId;
-        
+
         if (isset($this->timers[$id])) {
             unset($this->timers[$id]);
-            $this->queueNeedsRebuild = true;
             return true;
         }
 
         return false;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -82,21 +79,17 @@ final class TimerManager implements TimerManagerInterface
     {
         return isset($this->timers[(int)$timerId]);
     }
-    
+
     /**
      * @inheritDoc
      */
     public function hasReadyTimers(): bool
     {
-        if ($this->queueNeedsRebuild) {
-            $this->rebuildQueue();
-        }
-
         if ($this->timerQueue->isEmpty()) {
             return false;
         }
 
-        $currentTime = microtime(true);
+        $currentTime = hrtime(true);
 
         while (!$this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
@@ -113,21 +106,17 @@ final class TimerManager implements TimerManagerInterface
 
         return false;
     }
-    
+
     /**
      * @inheritDoc
      */
     public function processTimers(): bool
     {
-        if ($this->queueNeedsRebuild) {
-            $this->rebuildQueue();
-        }
-
         if ($this->timerQueue->isEmpty()) {
             return false;
         }
 
-        $currentTime = microtime(true);
+        $currentTime = hrtime(true);
 
         while (!$this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
@@ -149,9 +138,9 @@ final class TimerManager implements TimerManagerInterface
 
             if ($timer instanceof PeriodicTimer) {
                 $timer->execute();
-
+                
                 if ($timer->shouldContinue()) {
-                    $this->timerQueue->insert($id, (int)(-$timer->executeAt * 1000000));
+                    $this->timerQueue->insert($id, -$timer->executeAt);
                 } else {
                     unset($this->timers[$id]);
                 }
@@ -165,29 +154,25 @@ final class TimerManager implements TimerManagerInterface
 
         return false;
     }
-        
+
     /**
      * @inheritDoc
      */
     public function hasTimers(): bool
     {
-        return count($this->timers) > 0;
+        return \count($this->timers) > 0;
     }
-        
+
     /**
      * @inheritDoc
      */
     public function getNextTimerDelay(): ?float
     {
-        if ($this->queueNeedsRebuild) {
-            $this->rebuildQueue();
-        }
-
         if ($this->timerQueue->isEmpty()) {
             return null;
         }
 
-        $currentTime = microtime(true);
+        $currentTime = hrtime(true);
 
         while (!$this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
@@ -199,13 +184,16 @@ final class TimerManager implements TimerManagerInterface
                 continue;
             }
 
-            $delay = $this->timers[$id]->executeAt - $currentTime;
-            return $delay > 0 ? $delay : 0.0;
+            $delayNs = $this->timers[$id]->executeAt - $currentTime;
+            
+            $delaySecs = $delayNs / 1_000_000_000;
+
+            return $delaySecs > 0 ? $delaySecs : 0.0;
         }
 
         return null;
     }
-        
+
     /**
      * @inheritDoc
      */
@@ -214,19 +202,6 @@ final class TimerManager implements TimerManagerInterface
         $this->timers = [];
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-        $this->queueNeedsRebuild = false;
         $this->nextId = 0;
-    }
-
-    private function rebuildQueue(): void
-    {
-        $this->timerQueue = new SplPriorityQueue();
-        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-
-        foreach ($this->timers as $id => $timer) {
-            $this->timerQueue->insert($id, (int)(-$timer->executeAt * 1000000));
-        }
-
-        $this->queueNeedsRebuild = false;
     }
 }

@@ -12,19 +12,21 @@ final class Timer
      * @var callable
      */
     public $callback;
-    
-    public float $executeAt;
+
+    public int $executeAt; // Now in nanoseconds
 
     public function __construct(int $id, float $delay, callable $callback)
     {
         $this->id = $id;
         $this->callback = $callback;
-        $this->executeAt = microtime(true) + $delay;
+        $hr = hrtime(true);
+        $delayNs = (int)($delay * 1_000_000_000);
+        $this->executeAt = $hr + $delayNs;
     }
 
-    public function isReady(float $currentTime): bool
+    public function isReady(int $currentTimeNs): bool
     {
-        return $currentTime >= $this->executeAt;
+        return $currentTimeNs >= $this->executeAt;
     }
 
     public function execute(): void
@@ -32,4 +34,3 @@ final class Timer
         ($this->callback)();
     }
 }
-

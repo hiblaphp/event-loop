@@ -13,26 +13,26 @@ final class PeriodicTimer
      */
     public $callback;
 
-    public float $executeAt;
+    public int $executeAt;
 
-    public float $interval;
+    public int $intervalNs;
 
     public ?int $maxExecutions;
-    
+
     public int $executionCount = 0;
 
     public function __construct(int $id, float $interval, callable $callback, ?int $maxExecutions = null)
     {
         $this->id = $id;
         $this->callback = $callback;
-        $this->interval = $interval;
+        $this->intervalNs = (int)($interval * 1_000_000_000);
         $this->maxExecutions = $maxExecutions;
-        $this->executeAt = microtime(true) + $interval;
+        $this->executeAt = hrtime(true) + $this->intervalNs;
     }
 
-    public function isReady(float $currentTime): bool
+    public function isReady(int $currentTimeNs): bool
     {
-        return $currentTime >= $this->executeAt;
+        return $currentTimeNs >= $this->executeAt;
     }
 
     public function execute(): void
@@ -41,7 +41,7 @@ final class PeriodicTimer
         ($this->callback)();
 
         if ($this->shouldContinue()) {
-            $this->executeAt = microtime(true) + $this->interval;
+            $this->executeAt += $this->intervalNs;
         }
     }
 
