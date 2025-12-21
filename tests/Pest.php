@@ -4,14 +4,6 @@ declare(strict_types=1);
 
 use Hibla\EventLoop\EventLoopFactory;
 
-beforeEach(function () {
-    EventLoopFactory::reset();
-});
-
-afterEach(function () {
-    EventLoopFactory::reset();
-});
-
 expect()->extend('toBeResource', function () {
     return $this->toBeResource();
 });
@@ -22,13 +14,6 @@ expect()->extend('toBeValidTimestamp', function () {
         ->toBeLessThan(time() + 3600)
     ;
 });
-
-function skipOnCI(): void
-{
-    if (getenv('CI')) {
-        test()->markTestSkipped('Skipped on CI environment');
-    }
-}
 
 function createTestStream()
 {

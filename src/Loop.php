@@ -204,12 +204,12 @@ final class Loop
     }
 
     /**
-    * Schedules a callback to run on the next check phase of the event loop.
-    *
-    * Check phase callbacks run after all nextTick and microtask callbacks.
-    *
-    * @param  callable  $callback  The callback to execute on next check phase
-    */
+     * Schedules a callback to run on the next check phase of the event loop.
+     *
+     * Check phase callbacks run after all nextTick and microtask callbacks.
+     *
+     * @param  callable  $callback  The callback to execute on next check phase
+     */
     public static function setImmediate(callable $callback): void
     {
         self::getInstance()->setImmediate($callback);
@@ -226,6 +226,18 @@ final class Loop
     public static function defer(callable $callback): void
     {
         self::getInstance()->defer($callback);
+    }
+
+
+    /**
+     * Run a single iteration of the event loop.
+     * 
+     * This processes one cycle of timers, I/O, and callbacks.
+     * It will block (sleep) if there are no immediate tasks but pending future events.
+     */
+    public static function runOnce(): void
+    {
+        self::getInstance()->runOnce();
     }
 
     /**

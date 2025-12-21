@@ -87,16 +87,6 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * Get the timer manager.
-     *
-     * @return TimerManagerInterface The timer manager instance
-     */
-    public function getTimerManager(): TimerManagerInterface
-    {
-        return $this->timerManager;
-    }
-
-    /**
      * Get the singleton instance of the event loop.
      *
      * Creates a new instance if one doesn't exist, otherwise returns
@@ -245,18 +235,26 @@ final class EventLoopFactory implements LoopInterface
     /**
      * @inheritDoc
      */
+    public function runOnce(): void
+    {
+        $hasImmediateWork = $this->tick();
+
+        if ($this->sleepHandler->shouldSleep($hasImmediateWork)) {
+            $sleepTime = $this->sleepHandler->calculateOptimalSleep();
+            $this->sleepHandler->sleep($sleepTime);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function run(): void
     {
         while ($this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
-            $hasImmediateWork = $this->tick();
-
-            if ($this->sleepHandler->shouldSleep($hasImmediateWork)) {
-                $sleepTime = $this->sleepHandler->calculateOptimalSleep();
-                $this->sleepHandler->sleep($sleepTime);
-            }
+            $this->runOnce();
         }
 
-        if (! $this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
+        if (!$this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
             $this->handleGracefulShutdown();
         }
     }

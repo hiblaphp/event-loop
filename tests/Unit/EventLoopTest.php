@@ -47,12 +47,3 @@ describe('EventLoop State Management', function () {
         expect($loop->isIdle())->toBeFalse();
     });
 });
-
-describe('EventLoop Managers Access', function () {
-    it('provides access to timer manager', function () {
-        $loop = EventLoopFactory::getInstance();
-        $timerManager = $loop->getTimerManager();
-
-        expect($timerManager)->toBeInstanceOf(Hibla\EventLoop\Managers\TimerManager::class);
-    });
-});
