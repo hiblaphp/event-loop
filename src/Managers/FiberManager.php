@@ -52,16 +52,16 @@ final class FiberManager implements FiberManagerInterface
         if ($fiber->isTerminated()) {
             $this->activeFiberCount--;
 
-            if ($this->suspendedFibers->contains($fiber)) {
-                $this->suspendedFibers->detach($fiber);
+            if ($this->suspendedFibers->offsetExists($fiber)) {
+                $this->suspendedFibers->offsetUnset($fiber);
             }
 
             return;
         }
 
         // Only schedule if it's actually suspended
-        if ($this->suspendedFibers->contains($fiber)) {
-            $this->suspendedFibers->detach($fiber);
+        if ($this->suspendedFibers->offsetExists($fiber)) {
+            $this->suspendedFibers->offsetUnset($fiber);
             $this->readyQueue->enqueue($fiber);
         }
     }
@@ -71,7 +71,7 @@ final class FiberManager implements FiberManagerInterface
      */
     public function processFibers(): bool
     {
-        // CRITICAL:= // Fibers should only be resumed when explicitly scheduled via scheduleFiber()
+        // CRITICAL: Fibers should only be resumed when explicitly scheduled via scheduleFiber()
 
         if ($this->readyQueue->isEmpty()) {
             return false;
@@ -96,19 +96,19 @@ final class FiberManager implements FiberManagerInterface
 
                 if ($fiber->isSuspended()) {
                     // Track suspended fibers - they'll only be resumed when explicitly scheduled
-                    $this->suspendedFibers->attach($fiber);
+                    $this->suspendedFibers->offsetSet($fiber, null);
                 } elseif ($fiber->isTerminated()) {
                     $this->activeFiberCount--;
 
-                    if ($this->suspendedFibers->contains($fiber)) {
-                        $this->suspendedFibers->detach($fiber);
+                    if ($this->suspendedFibers->offsetExists($fiber)) {
+                        $this->suspendedFibers->offsetUnset($fiber);
                     }
                 }
             } catch (\Throwable $e) {
                 $this->activeFiberCount--;
 
-                if ($this->suspendedFibers->contains($fiber)) {
-                    $this->suspendedFibers->detach($fiber);
+                if ($this->suspendedFibers->offsetExists($fiber)) {
+                    $this->suspendedFibers->offsetUnset($fiber);
                 }
 
                 throw $e;
