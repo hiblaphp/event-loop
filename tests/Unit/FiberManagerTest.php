@@ -230,7 +230,7 @@ describe('FiberManager', function () {
         $manager = new FiberManager();
         $resumeCount = 0;
 
-        $fiber = new Fiber(function () use (&$resumeCount) {
+        $fiber = new Fiber(function () use (&$resumeCount): never {
             while (true) {
                 $resumeCount++;
                 Fiber::suspend();

@@ -38,10 +38,17 @@ final class PeriodicTimer
     public function execute(): void
     {
         $this->executionCount++;
+
+        $nextExecuteAt = $this->executeAt + $this->intervalNs;
+
         ($this->callback)();
 
         if ($this->shouldContinue()) {
-            $this->executeAt += $this->intervalNs;
+            $now = hrtime(true);
+
+            $this->executeAt = ($nextExecuteAt < $now)
+                ? $now + $this->intervalNs
+                : $nextExecuteAt;
         }
     }
 

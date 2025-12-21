@@ -72,6 +72,7 @@ describe('EventLoop Shutdown', function () {
 
         $loop->addPeriodicTimer(0.001, function () use (&$periodicExecutions) {
             $periodicExecutions++;
+            usleep(1000);
         });
 
         $loop->addTimer(0.005, function () use ($loop) {
