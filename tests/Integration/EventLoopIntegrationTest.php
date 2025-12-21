@@ -154,14 +154,12 @@ describe('EventLoop Integration', function () {
             $results[] = 'deferred';
         });
 
-        // Run for short duration
-        runLoopFor(0.01);
+        $loop->run();
 
         expect($results)->toContain('nextTick');
         expect($results)->toContain('timer');
         expect($results)->toContain('deferred');
 
-        // NextTick should come before deferred
         expect(array_search('nextTick', $results))->toBeLessThan(array_search('deferred', $results));
     });
 
@@ -193,7 +191,7 @@ describe('EventLoop Integration', function () {
 
         $loop->addPeriodicTimer(0.001, function () use (&$count) {
             $count++;
-        }, 5); // 5 executions max
+        }, 5); 
 
         $loop->addTimer(0.01, function () use ($loop) {
             $loop->stop();
@@ -212,7 +210,6 @@ describe('EventLoop Integration', function () {
             $executed = true;
         });
 
-        // Cancel before execution
         $cancelled = $loop->cancelTimer($timerId);
         expect($cancelled)->toBeTrue();
 
@@ -226,7 +223,6 @@ describe('EventLoop Integration', function () {
         $stream = createTestStream();
         $read = false;
 
-        // Write some data
         fwrite($stream, 'test data');
         rewind($stream);
 
