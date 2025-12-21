@@ -10,9 +10,9 @@ final class StateHandler
 
     private bool $forceShutdown = false;
 
-    private float $stopRequestTime = 0.0;
+    private int $stopRequestTimeNs = 0;
 
-    private float $gracefulShutdownTimeout = 2.0;
+    private int $gracefulShutdownTimeoutNs = 2_000_000_000;
 
     public function isRunning(): bool
     {
@@ -26,7 +26,7 @@ final class StateHandler
         }
 
         $this->running = false;
-        $this->stopRequestTime = microtime(true);
+        $this->stopRequestTimeNs = hrtime(true);
     }
 
     public function forceStop(): void
@@ -46,39 +46,39 @@ final class StateHandler
             return false;
         }
 
-        return microtime(true) - $this->stopRequestTime > $this->gracefulShutdownTimeout;
+        return hrtime(true) - $this->stopRequestTimeNs > $this->gracefulShutdownTimeoutNs;
     }
 
     public function start(): void
     {
         $this->running = true;
         $this->forceShutdown = false;
-        $this->stopRequestTime = 0.0;
+        $this->stopRequestTimeNs = 0;
     }
 
     public function setGracefulShutdownTimeout(float $timeout): void
     {
-        $this->gracefulShutdownTimeout = max(0.1, $timeout);
+        $this->gracefulShutdownTimeoutNs = (int)(max(0.1, $timeout) * 1_000_000_000);
     }
 
     public function getGracefulShutdownTimeout(): float
     {
-        return $this->gracefulShutdownTimeout;
+        return $this->gracefulShutdownTimeoutNs / 1_000_000_000;
     }
 
     public function getTimeSinceStopRequest(): float
     {
-        if ($this->stopRequestTime === 0.0) {
+        if ($this->stopRequestTimeNs === 0) {
             return 0.0;
         }
 
-        return microtime(true) - $this->stopRequestTime;
+        return (hrtime(true) - $this->stopRequestTimeNs) / 1_000_000_000;
     }
 
     public function isInGracefulShutdown(): bool
     {
         return ! $this->running &&
                ! $this->forceShutdown &&
-               $this->stopRequestTime > 0.0;
+               $this->stopRequestTimeNs > 0;
     }
 }
