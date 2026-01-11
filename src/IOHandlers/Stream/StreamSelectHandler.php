@@ -8,6 +8,8 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 final readonly class StreamSelectHandler
 {
+    private const int MAX_TIMEOUT_MICROSECONDS = 1_000;
+
     /**
      * @param  array<string, StreamWatcher>  $watchers
      * @return array<resource>
@@ -34,7 +36,7 @@ final readonly class StreamSelectHandler
             return [];
         }
 
-        @stream_select($read, $write, $except, 0);
+        @stream_select($read, $write, $except, 0, self::MAX_TIMEOUT_MICROSECONDS);
 
         return array_merge($read, $write);
     }
