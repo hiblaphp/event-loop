@@ -28,17 +28,18 @@ final readonly class StreamSelectHandler
                     $read[] = $stream;
                 } elseif ($watcher->getType() === StreamWatcher::TYPE_WRITE) {
                     $write[] = $stream;
+                    $except[] = $stream;
                 }
             }
         }
 
-        if (\count($read) === 0 && count($write) === 0) {
+        if (\count($read) === 0 && \count($write) === 0) {
             return [];
         }
 
         @stream_select($read, $write, $except, 0, self::MAX_TIMEOUT_MICROSECONDS);
 
-        return array_merge($read, $write);
+        return array_merge($read, $write, $except);
     }
 
     /**
