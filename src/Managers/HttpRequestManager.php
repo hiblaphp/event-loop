@@ -29,8 +29,11 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     private array $requestsById = [];
 
     private readonly CurlMultiHandle $multiHandle;
+
     private readonly HttpRequestHandler $requestHandler;
+
     private readonly HttpResponseHandler $responseHandler;
+
     private readonly CurlMultiHandler $curlHandler;
 
     public function __construct()
@@ -77,7 +80,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         $handleId = (int) $handle;
         if (isset($this->activeRequests[$handleId])) {
             curl_multi_remove_handle($this->multiHandle, $handle);
-            curl_close($handle);
+            unset($handle); 
             unset($this->activeRequests[$handleId]);
         }
 
@@ -119,7 +122,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         foreach ($this->activeRequests as $request) {
             $handle = $request->getHandle();
             curl_multi_remove_handle($this->multiHandle, $handle);
-            curl_close($handle);
+            unset($handle); 
 
             $request->getCallback()('Request cleared', null, 0, [], null);
 

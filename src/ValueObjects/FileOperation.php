@@ -8,22 +8,6 @@ final class FileOperation
 {
     private string $id;
 
-    private string $type;
-
-    private string $path;
-
-    private mixed $data;
-
-    /**
-     * @var callable
-     */
-    private $callback;
-
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options;
-
     private float $createdAt;
 
     private bool $cancelled = false;
@@ -34,21 +18,20 @@ final class FileOperation
     private $scheduledCallback = null;
 
     /**
+     * @param  string  $type
+     * @param  string  $path
+     * @param  mixed  $data
+     * @param  callable  $callback
      * @param  array<string, mixed>  $options
      */
     public function __construct(
-        string $type,
-        string $path,
-        mixed $data,
-        callable $callback,
-        array $options = []
+        private readonly string $type,
+        private readonly string $path,
+        private readonly mixed $data,
+        private readonly mixed $callback,
+        private readonly array $options = []
     ) {
         $this->id = uniqid('file_', true);
-        $this->type = $type;
-        $this->path = $path;
-        $this->data = $data;
-        $this->callback = $callback;
-        $this->options = $options;
         $this->createdAt = microtime(true);
     }
 
@@ -72,7 +55,10 @@ final class FileOperation
         return $this->data;
     }
 
-    public function getCallback(): callable
+    /**
+     * @return callable
+     */
+    public function getCallback()
     {
         return $this->callback;
     }
@@ -90,12 +76,18 @@ final class FileOperation
         return $this->createdAt;
     }
 
-    public function setScheduledCallback(callable $callback): void
+    /**
+     * @param  callable  $callback
+     */
+    public function setScheduledCallback($callback): void
     {
         $this->scheduledCallback = $callback;
     }
 
-    public function getScheduledCallback(): ?callable
+    /**
+     * @return callable|null
+     */
+    public function getScheduledCallback()
     {
         return $this->scheduledCallback;
     }

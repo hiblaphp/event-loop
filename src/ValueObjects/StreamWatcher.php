@@ -13,24 +13,15 @@ final class StreamWatcher
     private string $id;
 
     /**
-     * @var resource
-     */
-    private $stream;
-
-    /**
-     * @var callable(resource): void
-     */
-    private $callback;
-
-    private string $type;
-
-    /**
      * @param  resource  $stream
      * @param  callable(resource): void  $callback
      * @param  string  $type
      */
-    public function __construct($stream, callable $callback, string $type = self::TYPE_READ)
-    {
+    public function __construct(
+        private $stream,
+        private $callback,
+        private string $type = self::TYPE_READ
+    ) {
         if (! \is_resource($stream)) {
             throw new \TypeError('Expected resource, got ' . gettype($stream));
         }
@@ -40,9 +31,6 @@ final class StreamWatcher
         }
 
         $this->id = uniqid('sw_', true);
-        $this->stream = $stream;
-        $this->callback = $callback;
-        $this->type = $type;
     }
 
     public function getId(): string
@@ -61,14 +49,6 @@ final class StreamWatcher
     public function getType(): string
     {
         return $this->type;
-    }
-
-    /**
-     * @return callable(resource): void
-     */
-    public function getCallback(): callable
-    {
-        return $this->callback;
     }
 
     public function execute(): void

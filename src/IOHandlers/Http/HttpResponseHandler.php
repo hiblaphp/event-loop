@@ -82,7 +82,7 @@ final readonly class HttpResponseHandler
                 }
 
                 curl_multi_remove_handle($multiHandle, $handle);
-                curl_close($handle);
+                unset($handle);
                 unset($activeRequests[$handleId]);
                 $processed = true;
             }

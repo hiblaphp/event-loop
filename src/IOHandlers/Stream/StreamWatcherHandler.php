@@ -17,9 +17,4 @@ final readonly class StreamWatcherHandler
     {
         return new StreamWatcher($stream, $callback, $type);
     }
-
-    public function executeWatcher(StreamWatcher $watcher): void
-    {
-        $watcher->execute();
-    }
 }
