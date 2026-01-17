@@ -39,26 +39,29 @@ final readonly class StreamSelectHandler
 
         @stream_select($read, $write, $except, 0, self::MAX_TIMEOUT_MICROSECONDS);
 
-        return array_merge($read, $write, $except);
+        return [...$read, ...$write, ...$except];
     }
 
     /**
      * @param  array<resource>  $readyStreams  An array of stream resources that are ready.
      * @param  array<string, StreamWatcher>  &$watchers  The master map of active watchers, keyed by string ID.
      *                                                   This array is modified by reference.
-     * @param  array<int, string>  $streamToWatcherMap  Pre-built map of stream resource ID => watcher ID.
      */
-    public function processReadyStreams(
-        array $readyStreams, 
-        array &$watchers,
-        array $streamToWatcherMap
-    ): void
+    public function processReadyStreams(array $readyStreams, array &$watchers): void
     {
+        $lookupMap = [];
+        foreach ($watchers as $watcherId => $watcher) {
+            $stream = $watcher->getStream();
+            if (\is_resource($stream)) {
+                $lookupMap[(int) $stream] = $watcherId;
+            }
+        }
+
         foreach ($readyStreams as $stream) {
             $socketId = (int) $stream;
 
-            if (isset($streamToWatcherMap[$socketId])) {
-                $watcherId = $streamToWatcherMap[$socketId];
+            if (isset($lookupMap[$socketId])) {
+                $watcherId = $lookupMap[$socketId];
                 // Ensure the watcher still exists in the master list before processing.
                 if (isset($watchers[$watcherId])) {
                     $watcher = $watchers[$watcherId];
