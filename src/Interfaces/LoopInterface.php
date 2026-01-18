@@ -91,19 +91,21 @@ interface LoopInterface
 
     /**
      * Removes a read watcher by its watcher ID.
+     * Idempotent - safe to call multiple times with the same ID.
      * 
      * @param  string  $watcherId  The read watcher ID
      * @return bool True if removed successfully
-     * @throws \InvalidArgumentException If the watcher ID does not exist or is not a read watcher
+     * @throws \InvalidArgumentException If the watcher ID is not a read watcher
      */
     public function removeReadWatcher(string $watcherId): bool;
 
     /**
      * Removes a write watcher by its watcher ID.
+     * Idempotent - safe to call multiple times with the same ID.
      * 
      * @param  string  $watcherId  The write watcher ID
      * @return bool True if removed successfully
-     * @throws \InvalidArgumentException If the watcher ID does not exist or is not a write watcher
+     * @throws \InvalidArgumentException If the watcher ID is not a write watcher
      */
     public function removeWriteWatcher(string $watcherId): bool;
 

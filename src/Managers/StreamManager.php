@@ -55,9 +55,7 @@ final class StreamManager implements StreamManagerInterface
     public function removeReadWatcher(string $watcherId): bool
     {
         if (!isset($this->watchers[$watcherId])) {
-            throw new InvalidArgumentException(
-                "Watcher with ID '{$watcherId}' not found"
-            );
+           return false;
         }
         
         $watcher = $this->watchers[$watcherId];
@@ -77,9 +75,7 @@ final class StreamManager implements StreamManagerInterface
     public function removeWriteWatcher(string $watcherId): bool
     {
         if (!isset($this->watchers[$watcherId])) {
-            throw new InvalidArgumentException(
-                "Watcher with ID '{$watcherId}' not found"
-            );
+            return false;
         }
         
         $watcher = $this->watchers[$watcherId];

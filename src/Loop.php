@@ -184,9 +184,11 @@ final class Loop
 
     /**
      * Remove a watcher for read operations on a stream.
-     *
-     * @param  string  $readWatcherId  The read watcher ID to remove
-     * @return bool True if watcher was removed, false if not found
+     * Idempotent - safe to call multiple times with the same ID.
+     * 
+     * @param  string  $watcherId  The read watcher ID
+     * @return bool True if removed successfully
+     * @throws \InvalidArgumentException If the watcher ID is not a read watcher
      */
     public static function removeReadWatcher(string $readWatcherId): bool
     {
@@ -195,9 +197,11 @@ final class Loop
 
     /**
      * Remove a watcher for write operations on a stream.
-     *
+     * Idempotent - safe to call multiple times with the same ID.
+     * 
      * @param  string  $writeWatcherId  The write watcher ID to remove
      * @return bool True if watcher was removed, false if not found
+     * @throws \InvalidArgumentException If the watcher ID is not a write watcher
      */
     public static function removeWriteWatcher(string $writeWatcherId): bool
     {

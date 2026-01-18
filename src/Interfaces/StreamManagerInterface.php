@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Interfaces;
 
-use InvalidArgumentException;
-
 /**
  * Interface for managing stream watchers.
  */
@@ -31,19 +29,19 @@ interface StreamManagerInterface
 
     /**
      * Removes a read watcher by its watcher ID.
+     * Idempotent - safe to call multiple times with the same ID.
      * 
      * @param  string  $watcherId  The read watcher ID
-     * @return bool True if removed successfully
-     * @throws InvalidArgumentException If the watcher ID does not exist or is not a read watcher
+     * @return bool True if removed, false if not found or not a read watcher
      */
     public function removeReadWatcher(string $watcherId): bool;
 
     /**
      * Removes a write watcher by its watcher ID.
+     * Idempotent - safe to call multiple times with the same ID.
      * 
      * @param  string  $watcherId  The write watcher ID
-     * @return bool True if removed successfully
-     * @throws InvalidArgumentException If the watcher ID does not exist or is not a write watcher
+     * @return bool True if removed, false if not found or not a write watcher
      */
     public function removeWriteWatcher(string $watcherId): bool;
 
@@ -59,6 +57,7 @@ interface StreamManagerInterface
 
     /**
      * Removes a stream watcher by ID.
+     * Idempotent - safe to call multiple times with the same ID.
      *
      * @param  string  $watcherId  The watcher ID
      * @return bool True if removed, false if not found

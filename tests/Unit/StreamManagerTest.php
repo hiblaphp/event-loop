@@ -14,7 +14,7 @@ describe('StreamManager', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
-        $watcherId = $manager->addReadWatcher($stream, fn () => null);
+        $watcherId = $manager->addReadWatcher($stream, fn() => null);
 
         expect($watcherId)->toBeString();
         expect($manager->hasWatchers())->toBeTrue();
@@ -26,7 +26,7 @@ describe('StreamManager', function () {
         $manager = new StreamManager();
         [$client, $server] = createTcpSocketPair();
 
-        $watcherId = $manager->addWriteWatcher($client, fn () => null);
+        $watcherId = $manager->addWriteWatcher($client, fn() => null);
 
         expect($watcherId)->toBeString();
         expect($manager->hasWatchers())->toBeTrue();
@@ -39,7 +39,7 @@ describe('StreamManager', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
-        $watcherId = $manager->addReadWatcher($stream, fn () => null);
+        $watcherId = $manager->addReadWatcher($stream, fn() => null);
         expect($manager->hasWatchers())->toBeTrue();
 
         $removed = $manager->removeReadWatcher($watcherId);
@@ -53,7 +53,7 @@ describe('StreamManager', function () {
         $manager = new StreamManager();
         [$client, $server] = createTcpSocketPair();
 
-        $watcherId = $manager->addWriteWatcher($client, fn () => null);
+        $watcherId = $manager->addWriteWatcher($client, fn() => null);
         expect($manager->hasWatchers())->toBeTrue();
 
         $removed = $manager->removeWriteWatcher($watcherId);
@@ -64,27 +64,29 @@ describe('StreamManager', function () {
         fclose($server);
     });
 
-    it('throws exception when removing non-existent read watcher', function () {
+    it('returns false when removing non-existent read watcher', function () {
         $manager = new StreamManager();
 
-        expect(fn () => $manager->removeReadWatcher('non-existent-id'))
-            ->toThrow(InvalidArgumentException::class, "Watcher with ID 'non-existent-id' not found");
+        $result = $manager->removeReadWatcher('non-existent-id');
+
+        expect($result)->toBeFalse();
     });
 
-    it('throws exception when removing non-existent write watcher', function () {
+    it('returns false when removing non-existent write watcher', function () {
         $manager = new StreamManager();
 
-        expect(fn () => $manager->removeWriteWatcher('non-existent-id'))
-            ->toThrow(InvalidArgumentException::class, "Watcher with ID 'non-existent-id' not found");
+        $result = $manager->removeWriteWatcher('non-existent-id');
+
+        expect($result)->toBeFalse();
     });
 
     it('throws exception when removeReadWatcher receives a write watcher ID', function () {
         $manager = new StreamManager();
         [$client, $server] = createTcpSocketPair();
 
-        $writeWatcherId = $manager->addWriteWatcher($client, fn () => null);
+        $writeWatcherId = $manager->addWriteWatcher($client, fn() => null);
 
-        expect(fn () => $manager->removeReadWatcher($writeWatcherId))
+        expect(fn() => $manager->removeReadWatcher($writeWatcherId))
             ->toThrow(InvalidArgumentException::class, 'is not a READ watcher');
 
         fclose($client);
@@ -95,9 +97,9 @@ describe('StreamManager', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
-        $readWatcherId = $manager->addReadWatcher($stream, fn () => null);
+        $readWatcherId = $manager->addReadWatcher($stream, fn() => null);
 
-        expect(fn () => $manager->removeWriteWatcher($readWatcherId))
+        expect(fn() => $manager->removeWriteWatcher($readWatcherId))
             ->toThrow(InvalidArgumentException::class, 'is not a WRITE watcher');
 
         fclose($stream);
@@ -194,8 +196,8 @@ describe('StreamManager', function () {
         $stream1 = createTestStream();
         [$client, $server] = createTcpSocketPair();
 
-        $manager->addReadWatcher($stream1, fn () => null);
-        $manager->addWriteWatcher($client, fn () => null);
+        $manager->addReadWatcher($stream1, fn() => null);
+        $manager->addWriteWatcher($client, fn() => null);
 
         expect($manager->hasWatchers())->toBeTrue();
 
@@ -242,8 +244,8 @@ describe('StreamManager', function () {
         $stream1 = createTestStream();
         $stream2 = createTestStream();
 
-        $watcherId1 = $manager->addReadWatcher($stream1, fn () => null);
-        $watcherId2 = $manager->addReadWatcher($stream2, fn () => null);
+        $watcherId1 = $manager->addReadWatcher($stream1, fn() => null);
+        $watcherId2 = $manager->addReadWatcher($stream2, fn() => null);
 
         expect($manager->hasWatchers())->toBeTrue();
 
@@ -264,8 +266,8 @@ describe('StreamManager', function () {
         $stream = createTestStream();
         [$client, $server] = createTcpSocketPair();
 
-        $readWatcherId = $manager->addReadWatcher($stream, fn () => null);
-        $writeWatcherId = $manager->addWriteWatcher($client, fn () => null);
+        $readWatcherId = $manager->addReadWatcher($stream, fn() => null);
+        $writeWatcherId = $manager->addWriteWatcher($client, fn() => null);
 
         expect($manager->hasWatchers())->toBeTrue();
 
