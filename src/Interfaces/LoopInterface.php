@@ -72,6 +72,32 @@ interface LoopInterface
     public function removeStreamWatcher(string $watcherId): bool;
 
     /**
+     * @param  resource  $stream  The stream resource
+     * @param  callable  $callback  The callback function
+     * @return string The watcher ID
+     */
+    public function addReadWatcher($stream, callable $callback): string;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @param  callable  $callback  The callback function
+     * @return string The watcher ID
+     */
+    public function addWriteWatcher($stream, callable $callback): string;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @return bool True if removed, false if not found
+     */
+    public function removeReadWatcher($stream): bool;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @return bool True if removed, false if not found
+     */
+    public function removeWriteWatcher($stream): bool;
+
+    /**
      * Schedule an asynchronous file operation.
      *
      * @param  string  $type  Type of operation (read, write, append, etc.)

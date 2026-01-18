@@ -8,7 +8,7 @@ use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 final readonly class StreamSelectHandler
 {
-    private const int MAX_TIMEOUT_MICROSECONDS = 1_000;
+    private const int MAX_TIMEOUT_MICROSECONDS = 5_000;
 
     /**
      * @param  array<string, StreamWatcher>  $watchers
@@ -46,30 +46,37 @@ final readonly class StreamSelectHandler
      * @param  array<resource>  $readyStreams  An array of stream resources that are ready.
      * @param  array<string, StreamWatcher>  &$watchers  The master map of active watchers, keyed by string ID.
      *                                                   This array is modified by reference.
+     * @param  array<int, string>  &$readWatchers  Maps stream resource ID to READ watcher ID.
+     *                                             This array is modified by reference.
+     * @param  array<int, string>  &$writeWatchers  Maps stream resource ID to WRITE watcher ID.
+     *                                              This array is modified by reference.
      */
-    public function processReadyStreams(array $readyStreams, array &$watchers): void
-    {
-        $lookupMap = [];
-        foreach ($watchers as $watcherId => $watcher) {
-            $stream = $watcher->getStream();
-            if (\is_resource($stream)) {
-                $lookupMap[(int) $stream] = $watcherId;
-            }
-        }
-
+    public function processReadyStreams(
+        array $readyStreams, 
+        array &$watchers,
+        array &$readWatchers,
+        array &$writeWatchers
+    ): void {
         foreach ($readyStreams as $stream) {
-            $socketId = (int) $stream;
+            $streamId = (int) $stream;
 
-            if (isset($lookupMap[$socketId])) {
-                $watcherId = $lookupMap[$socketId];
-                // Ensure the watcher still exists in the master list before processing.
+            // Process read watcher if exists
+            if (isset($readWatchers[$streamId])) {
+                $watcherId = $readWatchers[$streamId];
                 if (isset($watchers[$watcherId])) {
-                    $watcher = $watchers[$watcherId];
-                    $watcher->execute();
-                    // If the watcher is a one-shot (like a WRITE), remove it.
-                    if ($watcher->getType() === StreamWatcher::TYPE_WRITE) {
-                        unset($watchers[$watcherId]);
-                    }
+                    $watchers[$watcherId]->execute();
+                }
+            }
+
+            // Process write watcher if exists
+            if (isset($writeWatchers[$streamId])) {
+                $watcherId = $writeWatchers[$streamId];
+                if (isset($watchers[$watcherId])) {
+                    $watchers[$watcherId]->execute();
+                    
+                    // Remove one-shot write watchers
+                    unset($writeWatchers[$streamId]);
+                    unset($watchers[$watcherId]);
                 }
             }
         }

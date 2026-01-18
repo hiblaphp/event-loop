@@ -183,6 +183,38 @@ final class EventLoopFactory implements LoopInterface
     /**
      * @inheritDoc
      */
+    public function addReadWatcher($stream, callable $callback): string
+    {
+        return $this->streamManager->addReadWatcher($stream, $callback);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function addWriteWatcher($stream, callable $callback): string
+    {
+        return $this->streamManager->addWriteWatcher($stream, $callback);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function removeReadWatcher($stream): bool
+    {
+        return $this->streamManager->removeReadWatcher($stream);
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public function removeWriteWatcher($stream): bool
+    {
+        return $this->streamManager->removeWriteWatcher($stream);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function addFiber(Fiber $fiber): void
     {
         /** @var Fiber<null, mixed, mixed, mixed> $compatibleFiber */

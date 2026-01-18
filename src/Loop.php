@@ -158,6 +158,53 @@ final class Loop
     }
 
     /**
+     * Add a watcher for read operations on a stream.
+     *
+     * @param  resource  $stream  The stream resource to watch for reads
+     * @param  callable  $callback  Function to execute when stream has data to read
+     * 
+     * @return string Unique identifier for the read watcher
+     */
+    public static function addReadWatcher($stream, callable $callback): string
+    {
+        return self::getInstance()->addReadWatcher($stream, $callback);
+    }
+
+    /**
+     * Add a watcher for write operations on a stream.
+     *
+     * @param  resource  $stream  The stream resource to watch for writes
+     * @param  callable  $callback  Function to execute when stream is ready for writing
+     * @return string Unique identifier for the write watcher
+     */
+    public static function addWriteWatcher($stream, callable $callback): string
+    {
+        return self::getInstance()->addWriteWatcher($stream, $callback);
+    }
+
+    /**
+     * Remove a watcher for read operations on a stream.
+     *
+     * @param  resource  $stream  The stream resource to stop watching for reads
+     * @return bool True if watcher was removed, false if not found
+     */
+    public static function removeReadWatcher($stream): bool
+    {
+        return self::getInstance()->removeReadWatcher($stream);
+    }
+
+    /**
+     * Remove a watcher for write operations on a stream.
+     *
+     * @param  resource  $stream  The stream resource to stop watching for writes
+     * @return bool True if watcher was removed, false if not found
+     */
+    public static function removeWriteWatcher($stream): bool
+    {
+        return self::getInstance()->removeWriteWatcher($stream);
+    }
+
+    /**
      * Add a fiber to be managed by the event loop.
      *
      * @param  Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber instance to add to the loop.

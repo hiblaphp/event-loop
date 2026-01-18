@@ -10,6 +10,32 @@ namespace Hibla\EventLoop\Interfaces;
 interface StreamManagerInterface
 {
     /**
+     * @param  resource  $stream  The stream resource
+     * @param  callable  $callback  The callback function
+     * @return string The watcher ID
+     */
+    public function addReadWatcher($stream, callable $callback): string;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @param  callable  $callback  The callback function
+     * @return string The watcher ID
+     */
+    public function addWriteWatcher($stream, callable $callback): string;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @return bool True if removed, false if not found
+     */
+    public function removeReadWatcher($stream): bool;
+
+    /**
+     * @param  resource  $stream  The stream resource
+     * @return bool True if removed, false if not found
+     */
+    public function removeWriteWatcher($stream): bool;
+
+    /**
      * Adds a new stream watcher.
      *
      * @param  resource  $stream  The stream resource

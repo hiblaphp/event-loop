@@ -10,11 +10,11 @@ describe('StreamManager', function () {
         expect($manager->hasWatchers())->toBeFalse();
     });
 
-    it('can add stream watchers', function () {
+    it('can add read stream watchers', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
-        $watcherId = $manager->addStreamWatcher($stream, fn () => null);
+        $watcherId = $manager->addReadWatcher($stream, fn () => null);
 
         expect($watcherId)->toBeString();
         expect($manager->hasWatchers())->toBeTrue();
@@ -22,33 +22,78 @@ describe('StreamManager', function () {
         fclose($stream);
     });
 
-    it('can remove stream watchers', function () {
+    it('can add write stream watchers', function () {
+        $manager = new StreamManager();
+        [$client, $server] = createTcpSocketPair();
+
+        $watcherId = $manager->addWriteWatcher($client, fn () => null);
+
+        expect($watcherId)->toBeString();
+        expect($manager->hasWatchers())->toBeTrue();
+
+        fclose($client);
+        fclose($server);
+    });
+
+    it('can remove read stream watchers', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
-        $watcherId = $manager->addStreamWatcher($stream, fn () => null);
+        $watcherId = $manager->addReadWatcher($stream, fn () => null);
         expect($manager->hasWatchers())->toBeTrue();
 
-        $removed = $manager->removeStreamWatcher($watcherId);
+        $removed = $manager->removeReadWatcher($stream);
         expect($removed)->toBeTrue();
         expect($manager->hasWatchers())->toBeFalse();
-
-        // Removing non-existent watcher
-        expect($manager->removeStreamWatcher('invalid'))->toBeFalse();
 
         fclose($stream);
     });
 
-    it('processes ready streams', function () {
+    it('can remove write stream watchers', function () {
+        $manager = new StreamManager();
+        [$client, $server] = createTcpSocketPair();
+
+        $watcherId = $manager->addWriteWatcher($client, fn () => null);
+        expect($manager->hasWatchers())->toBeTrue();
+
+        $removed = $manager->removeWriteWatcher($client);
+        expect($removed)->toBeTrue();
+        expect($manager->hasWatchers())->toBeFalse();
+
+        fclose($client);
+        fclose($server);
+    });
+
+    it('returns false when removing non-existent read watcher', function () {
+        $manager = new StreamManager();
+        $stream = createTestStream();
+
+        $result = $manager->removeReadWatcher($stream);
+        expect($result)->toBeFalse();
+
+        fclose($stream);
+    });
+
+    it('returns false when removing non-existent write watcher', function () {
+        $manager = new StreamManager();
+        [$client, $server] = createTcpSocketPair();
+
+        $result = $manager->removeWriteWatcher($client);
+        expect($result)->toBeFalse();
+
+        fclose($client);
+        fclose($server);
+    });
+
+    it('processes ready read streams', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
         $called = false;
 
-        // Write data to make stream readable
         fwrite($stream, 'test data');
         rewind($stream);
 
-        $manager->addStreamWatcher($stream, function () use (&$called) {
+        $manager->addReadWatcher($stream, function () use (&$called) {
             $called = true;
         });
 
@@ -59,7 +104,7 @@ describe('StreamManager', function () {
         fclose($stream);
     });
 
-    it('handles multiple stream types', function () {
+    it('handles multiple read streams', function () {
         $manager = new StreamManager();
         $stream1 = createTestStream();
         $stream2 = createTestStream();
@@ -67,19 +112,18 @@ describe('StreamManager', function () {
         $read1Called = false;
         $read2Called = false;
 
-        // Prepare both streams with data
         fwrite($stream1, 'data1');
         fwrite($stream2, 'data2');
         rewind($stream1);
         rewind($stream2);
 
-        $manager->addStreamWatcher($stream1, function () use (&$read1Called) {
+        $manager->addReadWatcher($stream1, function () use (&$read1Called) {
             $read1Called = true;
-        }, 'read');
+        });
 
-        $manager->addStreamWatcher($stream2, function () use (&$read2Called) {
+        $manager->addReadWatcher($stream2, function () use (&$read2Called) {
             $read2Called = true;
-        }, 'read');
+        });
 
         $manager->processStreams();
 
@@ -90,13 +134,50 @@ describe('StreamManager', function () {
         fclose($stream2);
     });
 
+    it('handles write streams', function () {
+        $manager = new StreamManager();
+        [$client, $server] = createTcpSocketPair();
+        $called = false;
+
+        $manager->addWriteWatcher($client, function () use (&$called) {
+            $called = true;
+        });
+
+        $manager->processStreams();
+
+        expect($called)->toBeTrue();
+
+        fclose($client);
+        fclose($server);
+    });
+
+    it('handles readable streams from network data', function () {
+        $manager = new StreamManager();
+        [$client, $server] = createTcpSocketPair();
+        $called = false;
+
+        $manager->addReadWatcher($server, function () use (&$called) {
+            $called = true;
+        });
+
+        fwrite($client, 'hello');
+        fflush($client);
+
+        $manager->processStreams();
+
+        expect($called)->toBeTrue();
+
+        fclose($client);
+        fclose($server);
+    });
+
     it('can clear all watchers', function () {
         $manager = new StreamManager();
         $stream1 = createTestStream();
-        $stream2 = createTestStream();
+        [$client, $server] = createTcpSocketPair();
 
-        $manager->addStreamWatcher($stream1, fn () => null);
-        $manager->addStreamWatcher($stream2, fn () => null);
+        $manager->addReadWatcher($stream1, fn () => null);
+        $manager->addWriteWatcher($client, fn () => null);
 
         expect($manager->hasWatchers())->toBeTrue();
 
@@ -105,6 +186,36 @@ describe('StreamManager', function () {
         expect($manager->hasWatchers())->toBeFalse();
 
         fclose($stream1);
-        fclose($stream2);
+        fclose($client);
+        fclose($server);
+    });
+
+    it('supports mixed read and write watchers', function () {
+        $manager = new StreamManager();
+        $readStream = createTestStream();
+        [$client, $server] = createTcpSocketPair();
+
+        $readCalled = false;
+        $writeCalled = false;
+
+        fwrite($readStream, 'test data');
+        rewind($readStream);
+
+        $manager->addReadWatcher($readStream, function () use (&$readCalled) {
+            $readCalled = true;
+        });
+
+        $manager->addWriteWatcher($client, function () use (&$writeCalled) {
+            $writeCalled = true;
+        });
+
+        $manager->processStreams();
+
+        expect($readCalled)->toBeTrue();
+        expect($writeCalled)->toBeTrue();
+
+        fclose($readStream);
+        fclose($client);
+        fclose($server);
     });
 });
