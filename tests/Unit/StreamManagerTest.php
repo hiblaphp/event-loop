@@ -35,28 +35,28 @@ describe('StreamManager', function () {
         fclose($server);
     });
 
-    it('can remove read stream watchers', function () {
+    it('can remove read stream watchers by watcher ID', function () {
         $manager = new StreamManager();
         $stream = createTestStream();
 
         $watcherId = $manager->addReadWatcher($stream, fn () => null);
         expect($manager->hasWatchers())->toBeTrue();
 
-        $removed = $manager->removeReadWatcher($stream);
+        $removed = $manager->removeReadWatcher($watcherId);
         expect($removed)->toBeTrue();
         expect($manager->hasWatchers())->toBeFalse();
 
         fclose($stream);
     });
 
-    it('can remove write stream watchers', function () {
+    it('can remove write stream watchers by watcher ID', function () {
         $manager = new StreamManager();
         [$client, $server] = createTcpSocketPair();
 
         $watcherId = $manager->addWriteWatcher($client, fn () => null);
         expect($manager->hasWatchers())->toBeTrue();
 
-        $removed = $manager->removeWriteWatcher($client);
+        $removed = $manager->removeWriteWatcher($watcherId);
         expect($removed)->toBeTrue();
         expect($manager->hasWatchers())->toBeFalse();
 
@@ -64,25 +64,43 @@ describe('StreamManager', function () {
         fclose($server);
     });
 
-    it('returns false when removing non-existent read watcher', function () {
+    it('throws exception when removing non-existent read watcher', function () {
         $manager = new StreamManager();
-        $stream = createTestStream();
 
-        $result = $manager->removeReadWatcher($stream);
-        expect($result)->toBeFalse();
-
-        fclose($stream);
+        expect(fn () => $manager->removeReadWatcher('non-existent-id'))
+            ->toThrow(InvalidArgumentException::class, "Watcher with ID 'non-existent-id' not found");
     });
 
-    it('returns false when removing non-existent write watcher', function () {
+    it('throws exception when removing non-existent write watcher', function () {
+        $manager = new StreamManager();
+
+        expect(fn () => $manager->removeWriteWatcher('non-existent-id'))
+            ->toThrow(InvalidArgumentException::class, "Watcher with ID 'non-existent-id' not found");
+    });
+
+    it('throws exception when removeReadWatcher receives a write watcher ID', function () {
         $manager = new StreamManager();
         [$client, $server] = createTcpSocketPair();
 
-        $result = $manager->removeWriteWatcher($client);
-        expect($result)->toBeFalse();
+        $writeWatcherId = $manager->addWriteWatcher($client, fn () => null);
+
+        expect(fn () => $manager->removeReadWatcher($writeWatcherId))
+            ->toThrow(InvalidArgumentException::class, 'is not a READ watcher');
 
         fclose($client);
         fclose($server);
+    });
+
+    it('throws exception when removeWriteWatcher receives a read watcher ID', function () {
+        $manager = new StreamManager();
+        $stream = createTestStream();
+
+        $readWatcherId = $manager->addReadWatcher($stream, fn () => null);
+
+        expect(fn () => $manager->removeWriteWatcher($readWatcherId))
+            ->toThrow(InvalidArgumentException::class, 'is not a WRITE watcher');
+
+        fclose($stream);
     });
 
     it('processes ready read streams', function () {
@@ -217,5 +235,57 @@ describe('StreamManager', function () {
         fclose($readStream);
         fclose($client);
         fclose($server);
+    });
+
+    it('can remove specific watchers without affecting others', function () {
+        $manager = new StreamManager();
+        $stream1 = createTestStream();
+        $stream2 = createTestStream();
+
+        $watcherId1 = $manager->addReadWatcher($stream1, fn () => null);
+        $watcherId2 = $manager->addReadWatcher($stream2, fn () => null);
+
+        expect($manager->hasWatchers())->toBeTrue();
+
+        $manager->removeReadWatcher($watcherId1);
+
+        expect($manager->hasWatchers())->toBeTrue();
+
+        $manager->removeReadWatcher($watcherId2);
+
+        expect($manager->hasWatchers())->toBeFalse();
+
+        fclose($stream1);
+        fclose($stream2);
+    });
+
+    it('can use removeStreamWatcher as a generic removal method', function () {
+        $manager = new StreamManager();
+        $stream = createTestStream();
+        [$client, $server] = createTcpSocketPair();
+
+        $readWatcherId = $manager->addReadWatcher($stream, fn () => null);
+        $writeWatcherId = $manager->addWriteWatcher($client, fn () => null);
+
+        expect($manager->hasWatchers())->toBeTrue();
+
+        $removed1 = $manager->removeStreamWatcher($readWatcherId);
+        $removed2 = $manager->removeStreamWatcher($writeWatcherId);
+
+        expect($removed1)->toBeTrue();
+        expect($removed2)->toBeTrue();
+        expect($manager->hasWatchers())->toBeFalse();
+
+        fclose($stream);
+        fclose($client);
+        fclose($server);
+    });
+
+    it('removeStreamWatcher returns false for non-existent watcher', function () {
+        $manager = new StreamManager();
+
+        $result = $manager->removeStreamWatcher('non-existent-id');
+
+        expect($result)->toBeFalse();
     });
 });

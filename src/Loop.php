@@ -185,23 +185,23 @@ final class Loop
     /**
      * Remove a watcher for read operations on a stream.
      *
-     * @param  resource  $stream  The stream resource to stop watching for reads
+     * @param  string  $readWatcherId  The read watcher ID to remove
      * @return bool True if watcher was removed, false if not found
      */
-    public static function removeReadWatcher($stream): bool
+    public static function removeReadWatcher(string $readWatcherId): bool
     {
-        return self::getInstance()->removeReadWatcher($stream);
+        return self::getInstance()->removeReadWatcher($readWatcherId);
     }
 
     /**
      * Remove a watcher for write operations on a stream.
      *
-     * @param  resource  $stream  The stream resource to stop watching for writes
+     * @param  string  $writeWatcherId  The write watcher ID to remove
      * @return bool True if watcher was removed, false if not found
      */
-    public static function removeWriteWatcher($stream): bool
+    public static function removeWriteWatcher(string $writeWatcherId): bool
     {
-        return self::getInstance()->removeWriteWatcher($stream);
+        return self::getInstance()->removeWriteWatcher($writeWatcherId);
     }
 
     /**

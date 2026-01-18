@@ -7,6 +7,7 @@ namespace Hibla\EventLoop\Managers;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\IOHandlers\Stream\StreamSelectHandler;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
+use InvalidArgumentException;
 
 final class StreamManager implements StreamManagerInterface
 {
@@ -51,31 +52,45 @@ final class StreamManager implements StreamManagerInterface
     /**
      * @inheritDoc
      */
-    public function removeReadWatcher($stream): bool
+    public function removeReadWatcher(string $watcherId): bool
     {
-        $streamId = (int) $stream;
-        
-        if (isset($this->readWatchers[$streamId])) {
-            $watcherId = $this->readWatchers[$streamId];
-            return $this->removeStreamWatcher($watcherId);
+        if (!isset($this->watchers[$watcherId])) {
+            throw new InvalidArgumentException(
+                "Watcher with ID '{$watcherId}' not found"
+            );
         }
         
-        return false;
+        $watcher = $this->watchers[$watcherId];
+        
+        if ($watcher->getType() !== StreamWatcher::TYPE_READ) {
+            throw new InvalidArgumentException(
+                "Watcher '{$watcherId}' is not a READ watcher, it is a {$watcher->getType()} watcher"
+            );
+        }
+        
+        return $this->removeStreamWatcher($watcherId);
     }
 
     /**
      * @inheritDoc
      */
-    public function removeWriteWatcher($stream): bool
+    public function removeWriteWatcher(string $watcherId): bool
     {
-        $streamId = (int) $stream;
-        
-        if (isset($this->writeWatchers[$streamId])) {
-            $watcherId = $this->writeWatchers[$streamId];
-            return $this->removeStreamWatcher($watcherId);
+        if (!isset($this->watchers[$watcherId])) {
+            throw new InvalidArgumentException(
+                "Watcher with ID '{$watcherId}' not found"
+            );
         }
         
-        return false;
+        $watcher = $this->watchers[$watcherId];
+        
+        if ($watcher->getType() !== StreamWatcher::TYPE_WRITE) {
+            throw new InvalidArgumentException(
+                "Watcher '{$watcherId}' is not a WRITE watcher, it is a {$watcher->getType()} watcher"
+            );
+        }
+        
+        return $this->removeStreamWatcher($watcherId);
     }
 
     /**

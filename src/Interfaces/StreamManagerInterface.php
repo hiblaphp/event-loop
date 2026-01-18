@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Interfaces;
 
+use InvalidArgumentException;
+
 /**
  * Interface for managing stream watchers.
  */
 interface StreamManagerInterface
 {
     /**
+     * Adds a watcher for read operations on a stream for event loop to call when stream is ready for reading.
+     * 
      * @param  resource  $stream  The stream resource
      * @param  callable  $callback  The callback function
      * @return string The watcher ID
@@ -17,6 +21,8 @@ interface StreamManagerInterface
     public function addReadWatcher($stream, callable $callback): string;
 
     /**
+     * Adds a watcher for write operations on a stream for event loop to call when stream is ready for writing.
+     * 
      * @param  resource  $stream  The stream resource
      * @param  callable  $callback  The callback function
      * @return string The watcher ID
@@ -24,16 +30,22 @@ interface StreamManagerInterface
     public function addWriteWatcher($stream, callable $callback): string;
 
     /**
-     * @param  resource  $stream  The stream resource
-     * @return bool True if removed, false if not found
+     * Removes a read watcher by its watcher ID.
+     * 
+     * @param  string  $watcherId  The read watcher ID
+     * @return bool True if removed successfully
+     * @throws InvalidArgumentException If the watcher ID does not exist or is not a read watcher
      */
-    public function removeReadWatcher($stream): bool;
+    public function removeReadWatcher(string $watcherId): bool;
 
     /**
-     * @param  resource  $stream  The stream resource
-     * @return bool True if removed, false if not found
+     * Removes a write watcher by its watcher ID.
+     * 
+     * @param  string  $watcherId  The write watcher ID
+     * @return bool True if removed successfully
+     * @throws InvalidArgumentException If the watcher ID does not exist or is not a write watcher
      */
-    public function removeWriteWatcher($stream): bool;
+    public function removeWriteWatcher(string $watcherId): bool;
 
     /**
      * Adds a new stream watcher.
