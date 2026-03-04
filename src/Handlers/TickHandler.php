@@ -182,7 +182,8 @@ final class TickHandler
     {
         $current = $this->immediateCallbacks;
         $this->immediateCallbacks = new SplQueue();
-        return $current; 
+
+        return $current;
     }
 
     /**

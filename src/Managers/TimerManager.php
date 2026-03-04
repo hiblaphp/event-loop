@@ -66,6 +66,7 @@ final class TimerManager implements TimerManagerInterface
 
         if (isset($this->timers[$id])) {
             unset($this->timers[$id]);
+
             return true;
         }
 
@@ -91,13 +92,14 @@ final class TimerManager implements TimerManagerInterface
 
         $currentTime = hrtime(true);
 
-        while (!$this->timerQueue->isEmpty()) {
+        while (! $this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
             assert(\is_array($item) && isset($item['data']));
             $id = $item['data'];
 
-            if (!isset($this->timers[$id])) {
+            if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
 
@@ -118,19 +120,20 @@ final class TimerManager implements TimerManagerInterface
 
         $currentTime = hrtime(true);
 
-        while (!$this->timerQueue->isEmpty()) {
+        while (! $this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
             assert(\is_array($item) && isset($item['data']));
             $id = $item['data'];
 
-            if (!isset($this->timers[$id])) {
+            if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
 
             $timer = $this->timers[$id];
 
-            if (!$timer->isReady($currentTime)) {
+            if (! $timer->isReady($currentTime)) {
                 return false;
             }
 
@@ -138,7 +141,7 @@ final class TimerManager implements TimerManagerInterface
 
             if ($timer instanceof PeriodicTimer) {
                 $timer->execute();
-                
+
                 if ($timer->shouldContinue()) {
                     $this->timerQueue->insert($id, -$timer->executeAt);
                 } else {
@@ -174,18 +177,19 @@ final class TimerManager implements TimerManagerInterface
 
         $currentTime = hrtime(true);
 
-        while (!$this->timerQueue->isEmpty()) {
+        while (! $this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
             assert(\is_array($item) && isset($item['data']));
             $id = $item['data'];
 
-            if (!isset($this->timers[$id])) {
+            if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
 
             $delayNs = $this->timers[$id]->executeAt - $currentTime;
-            
+
             $delaySecs = $delayNs / 1_000_000_000;
 
             return $delaySecs > 0 ? $delaySecs : 0.0;

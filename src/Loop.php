@@ -6,7 +6,6 @@ namespace Hibla\EventLoop;
 
 use Fiber;
 use Hibla\EventLoop\Interfaces\LoopInterface;
-use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 /**
  * Static convenience wrapper for the EventLoop singleton
@@ -138,7 +137,7 @@ final class Loop
      *
      * @param  resource  $stream  The stream resource to watch for reads
      * @param  callable  $callback  Function to execute when stream has data to read
-     * 
+     *
      * @return string Unique identifier for the read watcher
      */
     public static function addReadWatcher($stream, callable $callback): string
@@ -161,7 +160,7 @@ final class Loop
     /**
      * Remove a watcher for read operations on a stream.
      * Idempotent - safe to call multiple times with the same ID.
-     * 
+     *
      * @param  string  $readWatcherId  The read watcher ID
      * @return bool True if removed successfully
      * @throws \InvalidArgumentException If the watcher ID is not a read watcher
@@ -174,7 +173,7 @@ final class Loop
     /**
      * Remove a watcher for write operations on a stream.
      * Idempotent - safe to call multiple times with the same ID.
-     * 
+     *
      * @param  string  $writeWatcherId  The write watcher ID to remove
      * @return bool True if watcher was removed, false if not found
      * @throws \InvalidArgumentException If the watcher ID is not a write watcher
@@ -255,10 +254,9 @@ final class Loop
         self::getInstance()->defer($callback);
     }
 
-
     /**
      * Run a single iteration of the event loop.
-     * 
+     *
      * This processes one cycle of timers, I/O, and callbacks.
      * It will block (sleep) if there are no immediate tasks but pending future events.
      */

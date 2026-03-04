@@ -80,7 +80,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         $handleId = (int) $handle;
         if (isset($this->activeRequests[$handleId])) {
             curl_multi_remove_handle($this->multiHandle, $handle);
-            unset($handle); 
+            unset($handle);
             unset($this->activeRequests[$handleId]);
         }
 
@@ -122,7 +122,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         foreach ($this->activeRequests as $request) {
             $handle = $request->getHandle();
             curl_multi_remove_handle($this->multiHandle, $handle);
-            unset($handle); 
+            unset($handle);
 
             $request->getCallback()('Request cleared', null, 0, [], null);
 

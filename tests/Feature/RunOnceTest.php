@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\EventLoop\Loop;
 
 test('runOnce executes immediate tasks and returns immediately', function () {
@@ -29,9 +31,10 @@ test('runOnce executes one cycle but leaves future work pending', function () {
     Loop::runOnce();
 
     expect($tick1Executed)->toBeTrue('Immediate timer should run in first tick')
-        ->and($tick2Executed)->toBeFalse('Future timer should NOT run in first tick');
+        ->and($tick2Executed)->toBeFalse('Future timer should NOT run in first tick')
+    ;
 
-    usleep(250000); 
+    usleep(250000);
 
     Loop::runOnce();
 
@@ -47,11 +50,11 @@ test('runOnce advances time efficiently for future timers', function () {
     Loop::addTimer($delay, function () use (&$executed) {
         $executed = true;
     });
-    
-    $iterations = 0;
-    $maxIterations = 200; 
 
-    while (!$executed && $iterations < $maxIterations) {
+    $iterations = 0;
+    $maxIterations = 200;
+
+    while (! $executed && $iterations < $maxIterations) {
         Loop::runOnce();
         $iterations++;
     }
@@ -60,7 +63,7 @@ test('runOnce advances time efficiently for future timers', function () {
     $elapsedSecs = ($end - $start) / 1e9;
 
     expect($executed)->toBeTrue('Timer should execute within the manual pump loop');
-    
+
     expect($elapsedSecs)->toBeGreaterThanOrEqual($delay * 0.9);
 
     expect($iterations)->toBeLessThan($maxIterations);
@@ -74,11 +77,11 @@ test('runOnce allows manual loop pumping for background tasks', function () {
     });
 
     for ($i = 0; $i < 5; $i++) {
-        usleep(15000); 
+        usleep(15000);
         Loop::runOnce();
     }
 
     expect($counter)->toBeGreaterThanOrEqual(5);
-    
+
     Loop::stop();
 });

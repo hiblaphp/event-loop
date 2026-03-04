@@ -65,7 +65,7 @@ interface LoopInterface
 
     /**
      * Adds a watcher for read operations on a stream for event loop to call when stream is ready for reading.
-     * 
+     *
      * @param  resource  $stream  The stream resource
      * @param  callable  $callback  The callback function
      * @return string The watcher ID
@@ -74,7 +74,7 @@ interface LoopInterface
 
     /**
      * Adds a watcher for write operations on a stream for event loop to call when stream is ready for writing.
-     * 
+     *
      * @param  resource  $stream  The stream resource
      * @param  callable  $callback  The callback function
      * @return string The watcher ID
@@ -84,7 +84,7 @@ interface LoopInterface
     /**
      * Removes a read watcher by its watcher ID.
      * Idempotent - safe to call multiple times with the same ID.
-     * 
+     *
      * @param  string  $watcherId  The read watcher ID
      * @return bool True if removed successfully
      * @throws \InvalidArgumentException If the watcher ID is not a read watcher
@@ -94,7 +94,7 @@ interface LoopInterface
     /**
      * Removes a write watcher by its watcher ID.
      * Idempotent - safe to call multiple times with the same ID.
-     * 
+     *
      * @param  string  $watcherId  The write watcher ID
      * @return bool True if removed successfully
      * @throws \InvalidArgumentException If the watcher ID is not a write watcher
@@ -206,7 +206,7 @@ interface LoopInterface
 
     /**
      * Run a single iteration of the event loop.
-     * 
+     *
      * This processes one cycle of timers, I/O, and callbacks.
      * It will block (sleep) if there are no immediate tasks but pending future events.
      */

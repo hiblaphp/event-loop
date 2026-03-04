@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Hibla\EventLoop\Loop;
 
 beforeEach(function () {
@@ -7,7 +9,7 @@ beforeEach(function () {
 });
 
 test('periodic timer accuracy stays above 99% with sustained execution', function () {
-    $targetInterval = 0.1; 
+    $targetInterval = 0.1;
     $minIterations = 20;
     $timestamps = [];
     $timerId = null;
@@ -30,7 +32,8 @@ test('periodic timer accuracy stays above 99% with sustained execution', functio
     Loop::run();
     expect($timestamps)
         ->toBeArray()
-        ->and(count($timestamps))->toBeGreaterThanOrEqual($minIterations, 'Did not capture enough samples for accuracy check');
+        ->and(count($timestamps))->toBeGreaterThanOrEqual($minIterations, 'Did not capture enough samples for accuracy check')
+    ;
 
     $intervals = [];
     for ($i = 1; $i < count($timestamps); $i++) {
@@ -44,13 +47,14 @@ test('periodic timer accuracy stays above 99% with sustained execution', functio
     $accuracy = (1.0 - $errorPercentage) * 100;
 
     $message = sprintf(
-        "Accuracy fell below 99%%\nTarget: %.6fs\nActual: %.6fs\nAccuracy: %.4f%%\nSamples: %d", 
-        $targetInterval, 
-        $avgInterval, 
+        "Accuracy fell below 99%%\nTarget: %.6fs\nActual: %.6fs\nAccuracy: %.4f%%\nSamples: %d",
+        $targetInterval,
+        $avgInterval,
         $accuracy,
         count($timestamps)
     );
 
     expect($accuracy)
-        ->toBeGreaterThanOrEqual(99.0, $message);
+        ->toBeGreaterThanOrEqual(99.0, $message)
+    ;
 });

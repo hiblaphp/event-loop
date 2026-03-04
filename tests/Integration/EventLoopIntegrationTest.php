@@ -132,7 +132,7 @@ describe('EventLoop Integration', function () {
             '20. Top-level Timer',
             '21. Timer in Microtask',
             '22. Microtask in Timer',
-            '23. Set Immidiate in NextTick', 
+            '23. Set Immidiate in NextTick',
         ];
 
         expect($output)->toBe($expected);

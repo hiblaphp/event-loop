@@ -27,8 +27,8 @@ function createTestStream()
 
 function createTcpSocketPair(): array
 {
-    $server = stream_socket_server("tcp://127.0.0.1:0", $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
-    if (!$server) {
+    $server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr, STREAM_SERVER_BIND | STREAM_SERVER_LISTEN);
+    if (! $server) {
         throw new RuntimeException("Cannot create server socket: $errstr");
     }
 
@@ -37,16 +37,18 @@ function createTcpSocketPair(): array
     $port = $matches[1];
 
     $client = stream_socket_client("tcp://127.0.0.1:$port", $errno, $errstr, 5);
-    if (!$client) {
+    if (! $client) {
         fclose($server);
+
         throw new RuntimeException("Cannot create client socket: $errstr");
     }
 
     $serverConnection = stream_socket_accept($server, 5);
-    if (!$serverConnection) {
+    if (! $serverConnection) {
         fclose($client);
         fclose($server);
-        throw new RuntimeException("Cannot accept client connection");
+
+        throw new RuntimeException('Cannot accept client connection');
     }
 
     fclose($server);

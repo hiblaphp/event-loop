@@ -10,7 +10,12 @@ use InvalidArgumentException;
 
 final class StreamManager implements StreamManagerInterface
 {
-    private const int DEFAULT_TIMEOUT_MICROSECONDS = 5_000;
+    /**
+     * Default timeout used when no explicit timeout is passed by the caller.
+     * WorkHandler always passes a calculated value so this is only a safety
+     * fallback for direct/test callers that omit the argument.
+     */
+    private const int DEFAULT_TIMEOUT_MICROSECONDS = 200_000; // 200ms — PHP manual recommended minimum
 
     /**
      * @var array<int, array<string, StreamWatcher>>
@@ -48,7 +53,7 @@ final class StreamManager implements StreamManagerInterface
      */
     public function removeReadWatcher(string $watcherId): bool
     {
-        if (!isset($this->watcherIndex[$watcherId])) {
+        if (! isset($this->watcherIndex[$watcherId])) {
             return false;
         }
 
@@ -68,7 +73,7 @@ final class StreamManager implements StreamManagerInterface
      */
     public function removeWriteWatcher(string $watcherId): bool
     {
-        if (!isset($this->watcherIndex[$watcherId])) {
+        if (! isset($this->watcherIndex[$watcherId])) {
             return false;
         }
 
@@ -86,7 +91,59 @@ final class StreamManager implements StreamManagerInterface
     /**
      * {@inheritDoc}
      */
-    public function processStreams(): bool
+    public function removeStreamWatcher(string $watcherId): bool
+    {
+        if (! isset($this->watcherIndex[$watcherId])) {
+            return false;
+        }
+
+        $meta = $this->watcherIndex[$watcherId];
+        $streamId = $meta['streamId'];
+
+        if ($meta['type'] === StreamWatcher::TYPE_READ) {
+            unset($this->readWatchers[$streamId][$watcherId]);
+            if (\count($this->readWatchers[$streamId]) === 0) {
+                unset($this->readWatchers[$streamId]);
+            }
+        } else {
+            unset($this->writeWatchers[$streamId][$watcherId]);
+            if (\count($this->writeWatchers[$streamId]) === 0) {
+                unset($this->writeWatchers[$streamId]);
+            }
+        }
+
+        unset($this->watcherIndex[$watcherId]);
+
+        return true;
+    }
+
+    /**
+     * @param resource $stream
+     */
+    private function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
+    {
+        $watcher = new StreamWatcher($stream, $callback, $type);
+        $streamId = (int) $stream;
+        $watcherId = $watcher->getId();
+
+        if ($type === StreamWatcher::TYPE_READ) {
+            $this->readWatchers[$streamId][$watcherId] = $watcher;
+        } else {
+            $this->writeWatchers[$streamId][$watcherId] = $watcher;
+        }
+
+        $this->watcherIndex[$watcherId] = [
+            'type' => $type,
+            'streamId' => $streamId,
+        ];
+
+        return $watcherId;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function processStreams(int $timeoutMicroseconds = self::DEFAULT_TIMEOUT_MICROSECONDS): bool
     {
         if (\count($this->readWatchers) === 0 && \count($this->writeWatchers) === 0) {
             return false;
@@ -94,7 +151,8 @@ final class StreamManager implements StreamManagerInterface
 
         $readyStreams = $this->selectStreams(
             $this->readWatchers,
-            $this->writeWatchers
+            $this->writeWatchers,
+            $timeoutMicroseconds
         );
 
         $hasActivity = false;
@@ -147,69 +205,20 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * {@inheritDoc}
-     */
-    public function removeStreamWatcher(string $watcherId): bool
-    {
-        if (!isset($this->watcherIndex[$watcherId])) {
-            return false;
-        }
-
-        $meta = $this->watcherIndex[$watcherId];
-        $streamId = $meta['streamId'];
-
-        if ($meta['type'] === StreamWatcher::TYPE_READ) {
-            unset($this->readWatchers[$streamId][$watcherId]);
-            if (\count($this->readWatchers[$streamId]) === 0) {
-                unset($this->readWatchers[$streamId]);
-            }
-        } else {
-            unset($this->writeWatchers[$streamId][$watcherId]);
-            if (\count($this->writeWatchers[$streamId]) === 0) {
-                unset($this->writeWatchers[$streamId]);
-            }
-        }
-
-        unset($this->watcherIndex[$watcherId]);
-
-        return true;
-    }
-
-    /**
-     * @param resource $stream
-     */
-    private function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
-    {
-        $watcher = new StreamWatcher($stream, $callback, $type);
-        $streamId = (int) $stream;
-        $watcherId = $watcher->getId();
-
-        if ($type === StreamWatcher::TYPE_READ) {
-            $this->readWatchers[$streamId][$watcherId] = $watcher;
-        } else {
-            $this->writeWatchers[$streamId][$watcherId] = $watcher;
-        }
-
-        $this->watcherIndex[$watcherId] = [
-            'type' => $type,
-            'streamId' => $streamId,
-        ];
-
-        return $watcherId;
-    }
-
-    /**
-     * @param array<int, array<string, StreamWatcher>> $readWatchers
-     * @param array<int, array<string, StreamWatcher>> $writeWatchers
+     * @param  array<int, array<string, StreamWatcher>>  $readWatchers
+     * @param  array<int, array<string, StreamWatcher>>  $writeWatchers
      * @return array{read: array<resource>, write: array<resource>}
      */
-    private function selectStreams(array $readWatchers, array $writeWatchers): array
-    {
+    private function selectStreams(
+        array $readWatchers,
+        array $writeWatchers,
+        int $timeoutMicroseconds = self::DEFAULT_TIMEOUT_MICROSECONDS,
+    ): array {
         $read = [];
         $write = [];
         $except = null;
 
-        foreach ($readWatchers as $streamId => $watchers) {
+        foreach ($readWatchers as $watchers) {
             $watcher = reset($watchers);
             if ($watcher !== false) {
                 $stream = $watcher->getStream();
@@ -219,7 +228,7 @@ final class StreamManager implements StreamManagerInterface
             }
         }
 
-        foreach ($writeWatchers as $streamId => $watchers) {
+        foreach ($writeWatchers as $watchers) {
             $watcher = reset($watchers);
             if ($watcher !== false) {
                 $stream = $watcher->getStream();
@@ -233,7 +242,7 @@ final class StreamManager implements StreamManagerInterface
             return ['read' => [], 'write' => []];
         }
 
-        @stream_select($read, $write, $except, 0, self::DEFAULT_TIMEOUT_MICROSECONDS);
+        @stream_select($read, $write, $except, 0, $timeoutMicroseconds);
 
         return [
             'read' => \count($read) > 0 ? $read : [],

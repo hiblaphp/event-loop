@@ -21,7 +21,6 @@ use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
 use Hibla\EventLoop\Managers\SignalManager;
-use Hibla\EventLoop\ValueObjects\StreamWatcher;
 
 final class EventLoopFactory implements LoopInterface
 {
@@ -278,7 +277,7 @@ final class EventLoopFactory implements LoopInterface
             $this->runOnce();
         }
 
-        if (!$this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
+        if (! $this->stateHandler->isRunning() && $this->workHandler->hasWork()) {
             $this->handleGracefulShutdown();
         }
     }
