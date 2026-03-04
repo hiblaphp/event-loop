@@ -40,6 +40,13 @@ interface FiberManagerInterface
     public function hasFibers(): bool;
 
     /**
+     * Checks if there are any fibers ready to be processed.
+     *
+     * @return bool True if there are ready fibers
+     */
+    public function hasReadyFibers(): bool;
+
+    /**
      * Checks if there are any fibers that can be actively processed.
      *
      * @return bool True if there are active fibers

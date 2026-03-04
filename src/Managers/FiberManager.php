@@ -126,6 +126,15 @@ final class FiberManager implements FiberManagerInterface
         return $this->activeFiberCount > 0;
     }
 
+
+    /**
+     * @inheritdoc
+     */
+    public function hasReadyFibers(): bool
+    {
+        return !$this->readyQueue->isEmpty();
+    }
+
     /**
      * @inheritdoc
      */

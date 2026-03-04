@@ -76,9 +76,13 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        if ($this->fiberManager->processFibers()) {
-            $workDone = true;
-            $this->processTicksAndMicrotasks();
+        while ($this->fiberManager->hasReadyFibers()) {
+            if ($this->fiberManager->processFibers()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks(); 
+            } else {
+                break;
+            }
         }
 
         if ($this->processCheckPhase()) {
