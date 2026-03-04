@@ -167,9 +167,9 @@ final class EventLoopFactory implements LoopInterface
     /**
      * @inheritDoc
      */
-    public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
+    public function addReadWatcher($stream, callable $callback): string
     {
-        return $this->streamManager->addStreamWatcher($stream, $callback, $type);
+        return $this->streamManager->addReadWatcher($stream, $callback);
     }
 
     /**
@@ -178,14 +178,6 @@ final class EventLoopFactory implements LoopInterface
     public function removeStreamWatcher(string $watcherId): bool
     {
         return $this->streamManager->removeStreamWatcher($watcherId);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function addReadWatcher($stream, callable $callback): string
-    {
-        return $this->streamManager->addReadWatcher($stream, $callback);
     }
 
     /**
@@ -203,7 +195,7 @@ final class EventLoopFactory implements LoopInterface
     {
         return $this->streamManager->removeReadWatcher($stream);
     }
-    
+
     /**
      * @inheritDoc
      */

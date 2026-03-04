@@ -41,7 +41,7 @@ describe('EventLoop Shutdown', function () {
         $loop->defer(fn () => null);
 
         $stream = createTestStream();
-        $loop->addStreamWatcher($stream, fn () => null);
+        $loop->addReadWatcher($stream, fn () => null);
 
         expect($loop->hasTimers())->toBeTrue();
 

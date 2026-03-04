@@ -129,10 +129,10 @@ describe('EventLoop Integration', function () {
             '19. Top-level Microtask',
             '17. NextTick in complex',
             '18. Microtask in NextTick',
-            '23. Set Immidiate in NextTick',
             '20. Top-level Timer',
             '21. Timer in Microtask',
             '22. Microtask in Timer',
+            '23. Set Immidiate in NextTick', 
         ];
 
         expect($output)->toBe($expected);
@@ -191,7 +191,7 @@ describe('EventLoop Integration', function () {
 
         $loop->addPeriodicTimer(0.001, function () use (&$count) {
             $count++;
-        }, 5); 
+        }, 5);
 
         $loop->addTimer(0.01, function () use ($loop) {
             $loop->stop();
@@ -226,7 +226,7 @@ describe('EventLoop Integration', function () {
         fwrite($stream, 'test data');
         rewind($stream);
 
-        $watcherId = $loop->addStreamWatcher($stream, function () use (&$read) {
+        $watcherId = $loop->addReadWatcher($stream, function () use (&$read) {
             $read = true;
         });
 
@@ -234,7 +234,7 @@ describe('EventLoop Integration', function () {
 
         expect($read)->toBeTrue();
 
-        $loop->removeStreamWatcher($watcherId);
+        $loop->removeReadWatcher($watcherId);
         fclose($stream);
     });
 

@@ -134,30 +134,6 @@ final class Loop
     }
 
     /**
-     * Add a stream watcher for I/O operations.
-     *
-     * @param  resource  $stream  The stream resource to watch
-     * @param  callable  $callback  Function to execute when stream has data
-     * @param  string  $type  Type of stream watching (read/write)
-     * @return string Unique identifier for the stream watcher
-     */
-    public static function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
-    {
-        return self::getInstance()->addStreamWatcher($stream, $callback, $type);
-    }
-
-    /**
-     * Remove a stream watcher.
-     *
-     * @param  string  $watcherId  The watcher ID returned by addStreamWatcher()
-     * @return bool True if watcher was removed, false if not found
-     */
-    public static function removeStreamWatcher(string $watcherId): bool
-    {
-        return self::getInstance()->removeStreamWatcher($watcherId);
-    }
-
-    /**
      * Add a watcher for read operations on a stream.
      *
      * @param  resource  $stream  The stream resource to watch for reads

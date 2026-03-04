@@ -54,17 +54,9 @@ interface LoopInterface
     public function cancelHttpRequest(string $requestId): bool;
 
     /**
-     * Add a stream watcher for I/O operations.
-     *
-     * @param  resource  $stream  The stream resource to watch
-     * @param  callable  $callback  Function to execute when stream has data
-     * @param  string  $type  Type of stream operation (read/write)
-     * @return string Unique identifier for the stream watcher
-     */
-    public function addStreamWatcher($stream, callable $callback, string $type = 'read'): string;
-
-    /**
-     * Remove a stream watcher.
+     * Remove a stream watcher by its watcher ID.
+     * Can remove both read and write watchers.
+     * Idempotent - safe to call multiple times with the same ID.
      *
      * @param  string  $watcherId  The watcher ID returned by addStreamWatcher()
      * @return bool True if watcher was removed, false if not found

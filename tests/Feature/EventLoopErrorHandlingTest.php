@@ -92,7 +92,7 @@ describe('EventLoop Error Handling', function () {
 
         fwrite($write, 'test');
 
-        $loop->addStreamWatcher($read, function () use (&$exceptionThrown) {
+        $loop->addReadWatcher($read, function () use (&$exceptionThrown) {
             $exceptionThrown = true;
 
             throw new Exception('Stream callback error');
@@ -251,7 +251,7 @@ describe('EventLoop Error Handling', function () {
         stream_set_blocking($read, false);
         fwrite($write, 'data');
 
-        $loop->addStreamWatcher($read, function () {
+        $loop->addReadWatcher($read, function () {
             throw new Exception('Stream processing error');
         });
 
@@ -333,7 +333,7 @@ describe('EventLoop Error Handling', function () {
         $errorHandled = false;
         $successCallbackExecuted = false;
 
-        $loop->addStreamWatcher($read, function () use (&$errorHandled) {
+        $loop->addReadWatcher($read, function () use (&$errorHandled) {
             try {
                 throw new Exception('Stream processing error');
             } catch (Exception $e) {

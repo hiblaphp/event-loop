@@ -22,8 +22,7 @@ final class WorkHandler implements WorkHandlerInterface
         private TickHandler $tickHandler,
         private FileManagerInterface $fileManager,
         private SignalManagerInterface $signalManager,
-    ) {
-    }
+    ) {}
 
     public function hasWork(): bool
     {
@@ -86,6 +85,10 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
+        // Signals are intentionally excluded from hasPendingWork — they are
+        // edge-triggered and may never fire (e.g. SIGTERM on a normal exit).
+        // CPU spinning is already prevented by SleepHandler which yields to
+        // the OS when signals are the only remaining work source.
         $hasPendingWork = $this->tickHandler->hasTickCallbacks()
             || $this->tickHandler->hasMicrotaskCallbacks()
             || $this->tickHandler->hasImmediateCallbacks()
@@ -116,13 +119,13 @@ final class WorkHandler implements WorkHandlerInterface
     {
         $workDone = false;
 
-        while ($this->tickHandler->hasImmediateCallbacks()) {
-            if ($this->tickHandler->processImmediateCallbacks()) {
-                $workDone = true;
-                $this->processTicksAndMicrotasks();
-            } else {
-                break;
-            }
+        $queue = $this->tickHandler->swapImmediateQueue();
+
+        while (!$queue->isEmpty()) {
+            $callback = $queue->dequeue();
+            $callback();
+            $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
         return $workDone;

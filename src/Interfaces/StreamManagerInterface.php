@@ -46,17 +46,8 @@ interface StreamManagerInterface
     public function removeWriteWatcher(string $watcherId): bool;
 
     /**
-     * Adds a new stream watcher.
-     *
-     * @param  resource  $stream  The stream resource
-     * @param  callable  $callback  The callback function
-     * @param  string  $type  The watcher type (read/write)
-     * @return string The watcher ID
-     */
-    public function addStreamWatcher(mixed $stream, callable $callback, string $type): string;
-
-    /**
      * Removes a stream watcher by ID.
+     * Can remove both read and write watchers.
      * Idempotent - safe to call multiple times with the same ID.
      *
      * @param  string  $watcherId  The watcher ID

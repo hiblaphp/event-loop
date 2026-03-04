@@ -5,36 +5,30 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Managers;
 
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
-use Hibla\EventLoop\IOHandlers\Stream\StreamSelectHandler;
 use Hibla\EventLoop\ValueObjects\StreamWatcher;
 use InvalidArgumentException;
 
 final class StreamManager implements StreamManagerInterface
 {
-    /**
-     * @var array<string, StreamWatcher> All watchers indexed by their unique ID
-     */
-    private array $watchers = [];
+    private const int DEFAULT_TIMEOUT_MICROSECONDS = 5_000;
 
     /**
-     * @var array<int, string> Maps stream resource ID to READ watcher ID
+     * @var array<int, array<string, StreamWatcher>>
      */
     private array $readWatchers = [];
 
     /**
-     * @var array<int, string> Maps stream resource ID to WRITE watcher ID
+     * @var array<int, array<string, StreamWatcher>>
      */
     private array $writeWatchers = [];
 
-    private readonly StreamSelectHandler $selectHandler;
-
-    public function __construct()
-    {
-        $this->selectHandler = new StreamSelectHandler();
-    }
+    /**
+     * @var array<string, array{type: string, streamId: int}>
+     */
+    private array $watcherIndex = [];
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function addReadWatcher($stream, callable $callback): string
     {
@@ -42,7 +36,7 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function addWriteWatcher($stream, callable $callback): string
     {
@@ -50,132 +44,200 @@ final class StreamManager implements StreamManagerInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function removeReadWatcher(string $watcherId): bool
     {
-        if (!isset($this->watchers[$watcherId])) {
-           return false;
+        if (!isset($this->watcherIndex[$watcherId])) {
+            return false;
         }
-        
-        $watcher = $this->watchers[$watcherId];
-        
-        if ($watcher->getType() !== StreamWatcher::TYPE_READ) {
+
+        $meta = $this->watcherIndex[$watcherId];
+
+        if ($meta['type'] !== StreamWatcher::TYPE_READ) {
             throw new InvalidArgumentException(
-                "Watcher '{$watcherId}' is not a READ watcher, it is a {$watcher->getType()} watcher"
+                "Watcher '{$watcherId}' is not a READ watcher"
             );
         }
-        
+
         return $this->removeStreamWatcher($watcherId);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function removeWriteWatcher(string $watcherId): bool
     {
-        if (!isset($this->watchers[$watcherId])) {
+        if (!isset($this->watcherIndex[$watcherId])) {
             return false;
         }
-        
-        $watcher = $this->watchers[$watcherId];
-        
-        if ($watcher->getType() !== StreamWatcher::TYPE_WRITE) {
+
+        $meta = $this->watcherIndex[$watcherId];
+
+        if ($meta['type'] !== StreamWatcher::TYPE_WRITE) {
             throw new InvalidArgumentException(
-                "Watcher '{$watcherId}' is not a WRITE watcher, it is a {$watcher->getType()} watcher"
+                "Watcher '{$watcherId}' is not a WRITE watcher"
             );
         }
-        
+
         return $this->removeStreamWatcher($watcherId);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
-    public function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
+    public function processStreams(): bool
+    {
+        if (\count($this->readWatchers) === 0 && \count($this->writeWatchers) === 0) {
+            return false;
+        }
+
+        $readyStreams = $this->selectStreams(
+            $this->readWatchers,
+            $this->writeWatchers
+        );
+
+        $hasActivity = false;
+
+        foreach ($readyStreams['read'] as $stream) {
+            $streamId = (int) $stream;
+            if (isset($this->readWatchers[$streamId])) {
+                $watchers = $this->readWatchers[$streamId];
+                foreach ($watchers as $watcherId => $watcher) {
+                    if (isset($this->readWatchers[$streamId][$watcherId])) {
+                        $watcher->execute();
+                        $hasActivity = true;
+                    }
+                }
+            }
+        }
+
+        foreach ($readyStreams['write'] as $stream) {
+            $streamId = (int) $stream;
+            if (isset($this->writeWatchers[$streamId])) {
+                $watchers = $this->writeWatchers[$streamId];
+                foreach ($watchers as $watcherId => $watcher) {
+                    if (isset($this->writeWatchers[$streamId][$watcherId])) {
+                        $watcher->execute();
+                        $hasActivity = true;
+                    }
+                }
+            }
+        }
+
+        return $hasActivity;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function hasWatchers(): bool
+    {
+        return \count($this->readWatchers) > 0 || \count($this->writeWatchers) > 0;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function clearAllWatchers(): void
+    {
+        $this->readWatchers = [];
+        $this->writeWatchers = [];
+        $this->watcherIndex = [];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function removeStreamWatcher(string $watcherId): bool
+    {
+        if (!isset($this->watcherIndex[$watcherId])) {
+            return false;
+        }
+
+        $meta = $this->watcherIndex[$watcherId];
+        $streamId = $meta['streamId'];
+
+        if ($meta['type'] === StreamWatcher::TYPE_READ) {
+            unset($this->readWatchers[$streamId][$watcherId]);
+            if (\count($this->readWatchers[$streamId]) === 0) {
+                unset($this->readWatchers[$streamId]);
+            }
+        } else {
+            unset($this->writeWatchers[$streamId][$watcherId]);
+            if (\count($this->writeWatchers[$streamId]) === 0) {
+                unset($this->writeWatchers[$streamId]);
+            }
+        }
+
+        unset($this->watcherIndex[$watcherId]);
+
+        return true;
+    }
+
+    /**
+     * @param resource $stream
+     */
+    private function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
         $watcher = new StreamWatcher($stream, $callback, $type);
-        $watcherId = $watcher->getId();
         $streamId = (int) $stream;
-        
-        $this->watchers[$watcherId] = $watcher;
-        
+        $watcherId = $watcher->getId();
+
         if ($type === StreamWatcher::TYPE_READ) {
-            $this->readWatchers[$streamId] = $watcherId;
+            $this->readWatchers[$streamId][$watcherId] = $watcher;
         } else {
-            $this->writeWatchers[$streamId] = $watcherId;
+            $this->writeWatchers[$streamId][$watcherId] = $watcher;
         }
+
+        $this->watcherIndex[$watcherId] = [
+            'type' => $type,
+            'streamId' => $streamId,
+        ];
 
         return $watcherId;
     }
 
     /**
-     * @inheritDoc
+     * @param array<int, array<string, StreamWatcher>> $readWatchers
+     * @param array<int, array<string, StreamWatcher>> $writeWatchers
+     * @return array{read: array<resource>, write: array<resource>}
      */
-    public function removeStreamWatcher(string $watcherId): bool
+    private function selectStreams(array $readWatchers, array $writeWatchers): array
     {
-        if (!isset($this->watchers[$watcherId])) {
-            return false;
-        }
-        
-        $watcher = $this->watchers[$watcherId];
-        $stream = $watcher->getStream();
-        
-        if (\is_resource($stream)) {
-            $streamId = (int) $stream;
-            
-            if ($watcher->getType() === StreamWatcher::TYPE_READ) {
-                unset($this->readWatchers[$streamId]);
-            } else {
-                unset($this->writeWatchers[$streamId]);
+        $read = [];
+        $write = [];
+        $except = null;
+
+        foreach ($readWatchers as $streamId => $watchers) {
+            $watcher = reset($watchers);
+            if ($watcher !== false) {
+                $stream = $watcher->getStream();
+                if (\is_resource($stream)) {
+                    $read[] = $stream;
+                }
             }
         }
-        
-        unset($this->watchers[$watcherId]);
-        
-        return true;
-    }
 
-     /**
-      * @inheritDoc
-      */
-    public function processStreams(): bool
-    {
-        if (\count($this->watchers) === 0) {
-            return false;
-        }
-        
-        $readyStreams = $this->selectHandler->selectStreams($this->watchers);
-
-        if (\count($readyStreams) > 0) {
-            $this->selectHandler->processReadyStreams(
-                $readyStreams, 
-                $this->watchers,
-                $this->readWatchers,
-                $this->writeWatchers
-            );
-
-            return true;
+        foreach ($writeWatchers as $streamId => $watchers) {
+            $watcher = reset($watchers);
+            if ($watcher !== false) {
+                $stream = $watcher->getStream();
+                if (\is_resource($stream)) {
+                    $write[] = $stream;
+                }
+            }
         }
 
-        return false;
-    }
+        if (\count($read) === 0 && \count($write) === 0) {
+            return ['read' => [], 'write' => []];
+        }
 
-    /**
-     * @inheritDoc
-     */
-    public function hasWatchers(): bool
-    {
-        return \count($this->watchers) > 0;
-    }
+        @stream_select($read, $write, $except, 0, self::DEFAULT_TIMEOUT_MICROSECONDS);
 
-     /**
-      * @inheritDoc
-      */
-    public function clearAllWatchers(): void
-    {
-        $this->watchers = [];
-        $this->readWatchers = [];
-        $this->writeWatchers = [];
+        return [
+            'read' => \count($read) > 0 ? $read : [],
+            'write' => \count($write) > 0 ? $write : [],
+        ];
     }
 }

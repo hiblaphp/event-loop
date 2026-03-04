@@ -176,6 +176,16 @@ final class TickHandler
     }
 
     /**
+     * @return SplQueue<callable>
+     */
+    public function swapImmediateQueue(): SplQueue
+    {
+        $current = $this->immediateCallbacks;
+        $this->immediateCallbacks = new SplQueue();
+        return $current; 
+    }
+
+    /**
      * @return array<string, int>
      */
     public function getStats(): array
