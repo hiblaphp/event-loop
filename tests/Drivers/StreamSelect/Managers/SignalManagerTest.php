@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\StreamSelect\Managers\SignalManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\SignalManager;
 
 describe('SignalManager', function () {
     it('adds and processes signal listeners', function () {

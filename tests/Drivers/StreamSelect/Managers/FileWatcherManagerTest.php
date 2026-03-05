@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\StreamSelect\Managers\FileWatcherManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\FileWatcherManager;
 
 describe('FileWatcherManager', function () {
     it('starts with no watchers', function () {

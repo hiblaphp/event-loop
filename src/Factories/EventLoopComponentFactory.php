@@ -14,12 +14,12 @@ use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 
-use Hibla\EventLoop\StreamSelect\Managers\FileWatcherManager as StreamSelectFileWatcherManager;
-use Hibla\EventLoop\StreamSelect\Managers\SignalManager as StreamSelectSignalManager;
-use Hibla\EventLoop\StreamSelect\Managers\StreamManager as StreamSelectStreamManager;
-use Hibla\EventLoop\StreamSelect\Managers\TimerManager as StreamSelectTimerManager;
-use Hibla\EventLoop\StreamSelect\Handlers\SleepHandler as StreamSelectSleepHandler;
-use Hibla\EventLoop\StreamSelect\Handlers\WorkHandler as StreamSelectWorkHandler;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\FileWatcherManager as StreamSelectFileWatcherManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\SignalManager as StreamSelectSignalManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\StreamManager as StreamSelectStreamManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\TimerManager as StreamSelectTimerManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler as StreamSelectSleepHandler;
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\WorkHandler as StreamSelectWorkHandler;
 
 final class EventLoopComponentFactory
 {

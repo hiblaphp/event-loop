@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\EventLoop\StreamSelect\Handlers;
+namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;

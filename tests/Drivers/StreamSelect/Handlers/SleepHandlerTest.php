@@ -7,7 +7,7 @@ use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
-use Hibla\EventLoop\StreamSelect\Handlers\SleepHandler;
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler;
 
 function makeStreamSelectSleepHandler(
     ?TimerManagerInterface $timerManager = null,

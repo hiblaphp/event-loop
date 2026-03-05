@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\EventLoop\StreamSelect\Managers;
+namespace Hibla\EventLoop\Drivers\StreamSelect\Managers;
 
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\ValueObjects\PeriodicTimer;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\EventLoop\StreamSelect\Managers;
+namespace Hibla\EventLoop\Drivers\StreamSelect\Managers;
 
 use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\ValueObjects\FileWatcher;
