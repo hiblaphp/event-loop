@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Hibla\EventLoop\Handlers;
+namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
 use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;

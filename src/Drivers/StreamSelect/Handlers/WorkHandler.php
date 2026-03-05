@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Hibla\EventLoop\Handlers;
+namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
+use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
 use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
