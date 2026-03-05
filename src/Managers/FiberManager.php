@@ -98,7 +98,9 @@ final class FiberManager implements FiberManagerInterface
                     // Track suspended fibers - they'll only be resumed when explicitly scheduled
                     $this->suspendedFibers->offsetSet($fiber, null);
                 } elseif ($fiber->isTerminated()) {
-                    $this->activeFiberCount--;
+                    if ($this->activeFiberCount > 0) {
+                        $this->activeFiberCount--;
+                    }
 
                     if ($this->suspendedFibers->offsetExists($fiber)) {
                         $this->suspendedFibers->offsetUnset($fiber);
