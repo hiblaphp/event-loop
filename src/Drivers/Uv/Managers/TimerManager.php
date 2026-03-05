@@ -12,29 +12,29 @@ use SplPriorityQueue;
 final class TimerManager implements TimerManagerInterface
 {
     /**
-     *  @var resource 
+     * @var resource
      */
     private $uvLoop;
 
     /**
-     *  @var resource The ONLY libuv timer we will be using to schedule timers
+     * @var resource The ONLY libuv timer handle used to wake up uv_run
      */
     private $masterTimer;
 
     /**
-     *  @var array<int, Timer|PeriodicTimer> 
+     * @var array<int, Timer|PeriodicTimer>
      */
     private array $timers = [];
 
     /**
-     *  @var SplPriorityQueue<int, int> 
+     * @var SplPriorityQueue<int, int>
      */
     private SplPriorityQueue $timerQueue;
 
     private int $nextId = 0;
 
     /**
-     *  @var \Closure Shared callback to prevent GC collection
+     * @var \Closure Shared callback — just wakes PHP up, execution happens in WorkHandler
      */
     private \Closure $masterCallback;
 
@@ -46,8 +46,14 @@ final class TimerManager implements TimerManagerInterface
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
 
-        // One single closure for the entire lifecycle
-        $this->masterCallback = $this->processTimers(...);
+        // The master callback is intentionally a no-op.
+        // Its only job is to make uv_run() wake up when a timer is due.
+        // WorkHandler pulls the ready callbacks via collectReadyTimers()
+        // and executes them one at a time with microtask draining between each,
+        // matching Node.js timer phase semantics.
+        $this->masterCallback = function (): void {
+            // No-op: intentional. See above.
+        };
     }
 
     /**
@@ -62,7 +68,7 @@ final class TimerManager implements TimerManagerInterface
         $this->timerQueue->insert($id, -$timer->executeAt);
         $this->scheduleMasterTimer();
 
-        return (string)$id;
+        return (string) $id;
     }
 
     /**
@@ -77,7 +83,7 @@ final class TimerManager implements TimerManagerInterface
         $this->timerQueue->insert($id, -$periodicTimer->executeAt);
         $this->scheduleMasterTimer();
 
-        return (string)$id;
+        return (string) $id;
     }
 
     /**
@@ -85,12 +91,11 @@ final class TimerManager implements TimerManagerInterface
      */
     public function cancelTimer(string $timerId): bool
     {
-        $id = (int)$timerId;
+        $id = (int) $timerId;
 
         if (isset($this->timers[$id])) {
             unset($this->timers[$id]);
-            // No need to reschedule master immediately. It will wake up, 
-            // see the timer is gone, and skip it.
+
             return true;
         }
 
@@ -98,22 +103,31 @@ final class TimerManager implements TimerManagerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * Collect all ready timer callbacks without executing them.
+     *
+     * Returns an array of callables so WorkHandler can execute them
+     * one at a time with microtask draining between each, exactly
+     * matching Node.js timer phase semantics where nextTick and
+     * microtask queues are fully drained after every timer callback.
+     *
+     * @return list<callable>
      */
-    public function processTimers(): bool
+    public function collectReadyTimers(): array
     {
+        $callbacks = [];
+
         if ($this->timerQueue->isEmpty()) {
-            return false;
+            return $callbacks;
         }
 
         $currentTime = hrtime(true);
-        $processed = false;
 
         while (! $this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
+            assert(\is_array($item) && isset($item['data']));
             $id = $item['data'];
 
-            // Timer was cancelled
+            // Skip cancelled timers
             if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
                 continue;
@@ -121,34 +135,61 @@ final class TimerManager implements TimerManagerInterface
 
             $timer = $this->timers[$id];
 
-            // If the top timer isn't ready, no other timer is ready
             if (! $timer->isReady($currentTime)) {
                 break;
             }
 
             $this->timerQueue->extract();
-            $processed = true;
 
             if ($timer instanceof PeriodicTimer) {
-                $timer->execute();
-                if ($timer->shouldContinue()) {
-                    $this->timerQueue->insert($id, -$timer->executeAt);
-                } else {
-                    unset($this->timers[$id]);
-                }
-            } else {
-                $timer->execute();
-                unset($this->timers[$id]);
-            }
+                $callbacks[] = function () use ($timer, $id): void {
+                    $timer->execute();
 
-            // Update time after executing a callback, as it might have taken a while
-            $currentTime = hrtime(true);
+                    if ($timer->shouldContinue()) {
+                        $this->timerQueue->insert($id, -$timer->executeAt);
+                    } else {
+                        unset($this->timers[$id]);
+                    }
+                };
+            } else {
+                $callbacks[] = function () use ($timer, $id): void {
+                    $timer->execute();
+                    unset($this->timers[$id]);
+                };
+            }
         }
 
-        // Schedule the next wake-up
+        return $callbacks;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Executes all collected ready timers and reschedules the master handle.
+     * In the UV driver, WorkHandler bypasses this and calls collectReadyTimers()
+     * directly so it can drain ticks between each callback. This method exists
+     * to satisfy the interface and for non-WorkHandler callers.
+     */
+    public function processTimers(): bool
+    {
+        $callbacks = $this->collectReadyTimers();
+
+        foreach ($callbacks as $callback) {
+            $callback();
+        }
+
         $this->scheduleMasterTimer();
 
-        return $processed;
+        return \count($callbacks) > 0;
+    }
+
+    /**
+     * Reschedule the master libuv timer without executing any callbacks.
+     * Called by WorkHandler after it has finished executing collected timers.
+     */
+    public function rescheduleMaster(): void
+    {
+        $this->scheduleMasterTimer();
     }
 
     /**
@@ -164,6 +205,7 @@ final class TimerManager implements TimerManagerInterface
 
         while (! $this->timerQueue->isEmpty()) {
             $item = $this->timerQueue->top();
+            assert(\is_array($item) && isset($item['data']));
             $id = $item['data'];
 
             if (! isset($this->timers[$id])) {
@@ -171,7 +213,7 @@ final class TimerManager implements TimerManagerInterface
                 continue;
             }
 
-            $delayNs = $this->timers[$id]->executeAt - $currentTime;
+            $delayNs  = $this->timers[$id]->executeAt - $currentTime;
             $delaySecs = $delayNs / 1_000_000_000;
 
             return $delaySecs > 0 ? $delaySecs : 0.0;
@@ -185,7 +227,7 @@ final class TimerManager implements TimerManagerInterface
      */
     public function hasTimer(string $timerId): bool
     {
-        return isset($this->timers[(int)$timerId]);
+        return isset($this->timers[(int) $timerId]);
     }
 
     /**
@@ -198,8 +240,9 @@ final class TimerManager implements TimerManagerInterface
 
     /**
      * {@inheritdoc}
-     * 
-     *  WorkHandler relies on uv_run to trigger timers, so this is no-op.
+     *
+     * Always returns false — uv_run wakes PHP up when timers are due,
+     * so the PHP-land loop never needs to poll for readiness itself.
      */
     public function hasReadyTimers(): bool
     {
@@ -211,36 +254,32 @@ final class TimerManager implements TimerManagerInterface
      */
     public function clearAllTimers(): void
     {
-        if (uv_is_active($this->masterTimer)) {
-            uv_timer_stop($this->masterTimer);
+        if (\uv_is_active($this->masterTimer)) {
+            \uv_timer_stop($this->masterTimer);
         }
 
-        $this->timers = [];
+        $this->timers    = [];
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-        $this->nextId = 0;
+        $this->nextId    = 0;
     }
 
     private function scheduleMasterTimer(): void
     {
-        // Only stop if libuv considers the handle currently active.
-        // A one-shot timer (repeat=0) is automatically stopped by libuv
-        // after it fires, so calling uv_timer_stop() again would trigger
-        // the "already stopped" notice.
-        if (uv_is_active($this->masterTimer)) {
-            uv_timer_stop($this->masterTimer);
+        if (\uv_is_active($this->masterTimer)) {
+            \uv_timer_stop($this->masterTimer);
         }
 
         $nextDelay = $this->getNextTimerDelay();
 
         if ($nextDelay !== null) {
-            $delayMs = (int) ceil($nextDelay * 1000);
+            $delayMs = (int) \ceil($nextDelay * 1000);
 
             if ($delayMs < 0) {
                 $delayMs = 0;
             }
 
-            uv_timer_start($this->masterTimer, $delayMs, 0, $this->masterCallback);
+            \uv_timer_start($this->masterTimer, $delayMs, 0, $this->masterCallback);
         }
     }
 }

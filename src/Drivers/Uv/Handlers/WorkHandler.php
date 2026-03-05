@@ -6,11 +6,10 @@ namespace Hibla\EventLoop\Drivers\Uv\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
-use Hibla\EventLoop\Interfaces\TimerManagerInterface;
+use Hibla\EventLoop\Interfaces\UvTimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 
 final class WorkHandler implements WorkHandlerInterface
@@ -22,7 +21,7 @@ final class WorkHandler implements WorkHandlerInterface
 
     public function __construct(
         $uvLoop,
-        private TimerManagerInterface $timerManager,
+        private UvTimerManagerInterface $timerManager,
         private HttpRequestManagerInterface $httpRequestManager,
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
@@ -42,38 +41,66 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->signalManager->hasSignals();
     }
 
+    /**
+     * Process one full cycle of work following Node.js event loop semantics.
+     *
+     * The key difference from the StreamSelect driver is that libuv drives
+     * I/O and timer wake-ups internally via uv_run(). WorkHandler's job is
+     * to correctly interleave the PHP-land queues (nextTick, microtasks,
+     * fibers, setImmediate) around those native events.
+     *
+     * Timer phase works as follows:
+     *   1. uv_run() wakes up when a timer is due (master callback is a no-op).
+     *   2. WorkHandler calls collectReadyTimers() to pull all due callbacks
+     *      out of the queue without executing them yet.
+     *   3. Each callback is executed individually, with nextTick + microtask
+     *      queues fully drained after every single callback.
+     *   This matches Node.js semantics: "process.nextTick and microtask queues
+     *   are drained after every callback in the timers queue."
+     */
     public function processWork(): bool
     {
         $workDone = false;
 
-        // 1. Pre-loop: Drain NextTick & Microtasks
+        // 1. Pre-loop: Drain nextTick & microtasks before doing anything else
         if ($this->processTicksAndMicrotasks()) {
             $workDone = true;
         }
 
-        // 2. Determine UV Run Mode
-        // We poll (NOWAIT) if we have immediate fibers or immediate callbacks.
-        // We do NOT check deferreds here, as deferreds wait for an idle loop.
+        // 2. Determine UV run mode.
+        //    NOWAIT polls without blocking when there is already PHP-land work ready.
+        //    RUN_ONCE blocks until the next I/O or timer event when the queue is empty.
         $hasImmediateWork = $this->tickHandler->hasImmediateCallbacks()
             || $this->fiberManager->hasReadyFibers();
 
         $flags = $hasImmediateWork ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
 
-        // 3. Run LibUV (Processes Timers, Streams, File System, Signals natively)
-        // If an event fired, callbacks were executed inside this C-function.
-        $uvStatus = \uv_run($this->uvLoop, $flags);
-        
-        if ($uvStatus !== 0) {
+        // 3. Run libuv — wakes up when a timer fires or I/O is ready.
+        //    Stream and signal callbacks execute inside this call.
+        //    Timer master callback is intentionally a no-op; we pull timers below.
+        \uv_run($this->uvLoop, $flags);
+
+        // 4. Timer phase — Node.js semantics.
+        //    Collect all callbacks that became ready during/before uv_run(),
+        //    then execute them one at a time, draining ticks after each one.
+        $timerCallbacks = $this->timerManager->collectReadyTimers();
+
+        foreach ($timerCallbacks as $callback) {
+            $callback();
             $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
-        // IMPORTANT: Drain microtasks queued by any I/O or Timer callbacks 
-        // that just fired inside uv_run.
+        // Reschedule the master libuv timer for the next pending timer now
+        // that we have consumed the ready ones.
+        $this->timerManager->rescheduleMaster();
+
+        // Drain any ticks queued by stream/signal callbacks that ran inside uv_run
         if ($this->processTicksAndMicrotasks()) {
             $workDone = true;
         }
 
-        // 4. Fiber Phase
+        // 5. Fiber phase — drain all ready fibers, draining ticks between each
         while ($this->fiberManager->hasReadyFibers()) {
             if ($this->fiberManager->processFibers()) {
                 $workDone = true;
@@ -83,20 +110,19 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        // 5. HTTP (cURL) Phase
-        // Note: For full uv compliance later, curl multi can be tied to uv_poll.
+        // 6. HTTP (cURL) phase
         if ($this->httpRequestManager->processRequests()) {
             $workDone = true;
             $this->processTicksAndMicrotasks();
         }
 
-        // 6. Check Phase (setImmediate)
+        // 7. Check phase — setImmediate callbacks via queue swap (Node.js semantics)
         if ($this->processCheckPhase()) {
             $workDone = true;
         }
 
-        // 7. Deferred Phase (Cleanup/Idle Phase)
-        // Only process deferreds if there is NO pending work (timers, io, fibers, etc).
+        // 8. Deferred / close-callbacks phase.
+        //    Only runs when all other work is fully drained.
         $hasPendingWork = $this->tickHandler->hasTickCallbacks()
             || $this->tickHandler->hasMicrotaskCallbacks()
             || $this->tickHandler->hasImmediateCallbacks()
@@ -112,11 +138,17 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        // We return true because the loop might simply be sleeping waiting for an event.
-        // Returning true prevents the main factory loop from exiting prematurely.
+        // Always return true — the loop may simply be sleeping waiting for
+        // the next I/O or timer event. Returning false would cause the factory
+        // loop to exit prematurely.
         return true;
     }
 
+    /**
+     * Check phase: execute setImmediate callbacks using a queue swap so that
+     * any setImmediate() calls made during this phase land in the next iteration,
+     * preventing starvation of timers and I/O.
+     */
     private function processCheckPhase(): bool
     {
         $workDone = false;
@@ -126,14 +158,17 @@ final class WorkHandler implements WorkHandlerInterface
             $callback = $queue->dequeue();
             $callback();
             $workDone = true;
-            
-            // Microtasks can be queued by setImmediate callbacks
             $this->processTicksAndMicrotasks();
         }
 
         return $workDone;
     }
 
+    /**
+     * Drain nextTick and microtask queues with correct priority.
+     * nextTick always runs before microtasks.
+     * Keeps looping until both queues are completely empty.
+     */
     private function processTicksAndMicrotasks(): bool
     {
         $workDone = false;
