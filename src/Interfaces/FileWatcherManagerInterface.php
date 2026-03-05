@@ -17,7 +17,7 @@ interface FileWatcherManagerInterface
      * @param  array<string, mixed>  $options  Watcher options
      * @return string The watcher ID
      */
-    public function addFileWatcher(string $path, callable $callback, array $options =[]): string;
+    public function addFileWatcher(string $path, callable $callback, array $options = []): string;
 
     /**
      * Removes a file watcher.

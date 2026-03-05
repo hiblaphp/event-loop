@@ -37,7 +37,7 @@ final class FileWatcherManager implements FileWatcherManagerInterface
      */
     public function removeFileWatcher(string $watcherId): bool
     {
-        if (!isset($this->watchersById[$watcherId])) {
+        if (! isset($this->watchersById[$watcherId])) {
             return false;
         }
 
@@ -90,11 +90,11 @@ final class FileWatcherManager implements FileWatcherManagerInterface
 
     private function checkWatcher(FileWatcher $watcher): bool
     {
-        if (!$watcher->shouldCheck()) {
+        if (! $watcher->shouldCheck()) {
             return false;
         }
 
-        if (!$watcher->checkForChanges()) {
+        if (! $watcher->checkForChanges()) {
             return false;
         }
 

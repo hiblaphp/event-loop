@@ -25,7 +25,7 @@ describe('FileWatcherManager', function () {
     it('returns unique IDs for each watcher', function () {
         $manager = new FileWatcherManager();
 
-        $first  = $manager->addFileWatcher('/tmp/file-a.txt', fn () => null);
+        $first = $manager->addFileWatcher('/tmp/file-a.txt', fn () => null);
         $second = $manager->addFileWatcher('/tmp/file-b.txt', fn () => null);
 
         expect($first)->not->toBe($second);
@@ -49,7 +49,7 @@ describe('FileWatcherManager', function () {
     it('only removes the targeted watcher, leaving others intact', function () {
         $manager = new FileWatcherManager();
 
-        $first  = $manager->addFileWatcher('/tmp/file-a.txt', fn () => null);
+        $first = $manager->addFileWatcher('/tmp/file-a.txt', fn () => null);
         $second = $manager->addFileWatcher('/tmp/file-b.txt', fn () => null);
 
         $manager->removeFileWatcher($first);
@@ -81,8 +81,8 @@ describe('FileWatcherManager', function () {
     it('invokes the callback with the correct event type when a file is modified', function () {
         $file = tempnam(sys_get_temp_dir(), 'hibla_test_');
 
-        $manager  = new FileWatcherManager();
-        $events   = [];
+        $manager = new FileWatcherManager();
+        $events = [];
 
         $manager->addFileWatcher(
             $file,
@@ -109,7 +109,7 @@ describe('FileWatcherManager', function () {
         $file = tempnam(sys_get_temp_dir(), 'hibla_test_');
 
         $manager = new FileWatcherManager();
-        $events  = [];
+        $events = [];
 
         $manager->addFileWatcher(
             $file,
@@ -131,8 +131,8 @@ describe('FileWatcherManager', function () {
     it('does not invoke the callback when a file has not changed', function () {
         $file = tempnam(sys_get_temp_dir(), 'hibla_test_');
 
-        $manager  = new FileWatcherManager();
-        $called   = false;
+        $manager = new FileWatcherManager();
+        $called = false;
 
         $manager->addFileWatcher(
             $file,
