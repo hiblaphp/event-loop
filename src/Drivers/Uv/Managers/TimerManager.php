@@ -211,13 +211,11 @@ final class TimerManager implements TimerManagerInterface
      */
     public function clearAllTimers(): void
     {
-        foreach ($this->uvHandles as $handle) {
-            @\uv_timer_stop($handle);
-            \uv_close($handle);
-        }
+        @\uv_timer_stop($this->masterTimer);
 
-        $this->uvHandles = [];
         $this->timers = [];
+        $this->timerQueue = new SplPriorityQueue();
+        $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
         $this->nextId = 0;
     }
 

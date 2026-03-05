@@ -52,30 +52,27 @@ final class EventLoopComponentFactory
         StreamManagerInterface $streamManager,
         FiberManagerInterface $fiberManager,
         TickHandler $tickHandler,
-        FileWatcherManagerInterface $fileWatcherManager,
         SignalManagerInterface $signalManager,
     ): WorkHandlerInterface {
         if ($loopResource !== null) {
             return new UvWorkHandler(
-                $loopResource,
-                $timerManager,
-                $httpRequestManager,
-                $streamManager,
-                $fiberManager,
-                $tickHandler,
-                $fileWatcherManager,
-                $signalManager
+                uvLoop: $loopResource,
+                timerManager: $timerManager,
+                httpRequestManager: $httpRequestManager,
+                streamManager: $streamManager,
+                fiberManager: $fiberManager,
+                tickHandler: $tickHandler,
+                signalManager: $signalManager
             );
         }
 
         return new StreamSelectWorkHandler(
-            $timerManager,
-            $httpRequestManager,
-            $streamManager,
-            $fiberManager,
-            $tickHandler,
-            $fileWatcherManager,
-            $signalManager,
+            timerManager: $timerManager,
+            httpRequestManager: $httpRequestManager,
+            streamManager: $streamManager,
+            fiberManager: $fiberManager,
+            tickHandler: $tickHandler,
+            signalManager: $signalManager,
         );
     }
 
@@ -85,7 +82,6 @@ final class EventLoopComponentFactory
         FiberManagerInterface $fiberManager,
         HttpRequestManagerInterface $httpRequestManager,
         StreamManagerInterface $streamManager,
-        FileWatcherManagerInterface $fileWatcherManager,
     ): SleepHandlerInterface {
         if ($loopResource !== null) {
             return new UvSleepHandler();
@@ -96,7 +92,6 @@ final class EventLoopComponentFactory
             $fiberManager,
             $httpRequestManager,
             $streamManager,
-            $fileWatcherManager
         );
     }
 
@@ -116,15 +111,6 @@ final class EventLoopComponentFactory
         }
 
         return new StreamSelectStreamManager();
-    }
-
-    public static function createFileWatcherManager(mixed $loopResource): FileWatcherManagerInterface
-    {
-        if ($loopResource !== null) {
-            return new UvFileWatcherManager($loopResource);
-        }
-
-        return new StreamSelectFileWatcherManager();
     }
 
     public static function createSignalManager(mixed $loopResource): SignalManagerInterface

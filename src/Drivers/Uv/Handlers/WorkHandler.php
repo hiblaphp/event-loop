@@ -27,7 +27,6 @@ final class WorkHandler implements WorkHandlerInterface
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
-        private FileWatcherManagerInterface $fileWatcherManager,
         private SignalManagerInterface $signalManager,
     ) {
         $this->uvLoop = $uvLoop;
@@ -38,7 +37,6 @@ final class WorkHandler implements WorkHandlerInterface
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
@@ -48,24 +46,34 @@ final class WorkHandler implements WorkHandlerInterface
     {
         $workDone = false;
 
-        // 1. Pre-loop: NextTick & Microtasks
+        // 1. Pre-loop: Drain NextTick & Microtasks
         if ($this->processTicksAndMicrotasks()) {
             $workDone = true;
         }
 
         // 2. Determine UV Run Mode
         // We poll (NOWAIT) if we have immediate fibers or immediate callbacks.
+        // We do NOT check deferreds here, as deferreds wait for an idle loop.
         $hasImmediateWork = $this->tickHandler->hasImmediateCallbacks()
             || $this->fiberManager->hasReadyFibers();
-            // Note: We removed hasDeferredCallbacks() from here because deferreds 
-            // shouldn't force a spin; they wait for idle.
 
         $flags = $hasImmediateWork ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
 
-        // 3. Run LibUV
-        \uv_run($this->uvLoop, $flags);
+        // 3. Run LibUV (Processes Timers, Streams, File System, Signals natively)
+        // If an event fired, callbacks were executed inside this C-function.
+        $uvStatus = \uv_run($this->uvLoop, $flags);
+        
+        if ($uvStatus !== 0) {
+            $workDone = true;
+        }
 
-        // 4. Manual Phases
+        // IMPORTANT: Drain microtasks queued by any I/O or Timer callbacks 
+        // that just fired inside uv_run.
+        if ($this->processTicksAndMicrotasks()) {
+            $workDone = true;
+        }
+
+        // 4. Fiber Phase
         while ($this->fiberManager->hasReadyFibers()) {
             if ($this->fiberManager->processFibers()) {
                 $workDone = true;
@@ -75,24 +83,25 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
+        // 5. HTTP (cURL) Phase
+        // Note: For full uv compliance later, curl multi can be tied to uv_poll.
         if ($this->httpRequestManager->processRequests()) {
             $workDone = true;
+            $this->processTicksAndMicrotasks();
         }
 
-        // 5. Check Phase
+        // 6. Check Phase (setImmediate)
         if ($this->processCheckPhase()) {
             $workDone = true;
         }
 
-        // 6. Deferred Phase (Corrected Logic)
-        // Only process deferreds if there is NO pending work (timers, io, fibers, etc)
-        // This matches StreamSelect behavior.
+        // 7. Deferred Phase (Cleanup/Idle Phase)
+        // Only process deferreds if there is NO pending work (timers, io, fibers, etc).
         $hasPendingWork = $this->tickHandler->hasTickCallbacks()
             || $this->tickHandler->hasMicrotaskCallbacks()
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -103,6 +112,8 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
+        // We return true because the loop might simply be sleeping waiting for an event.
+        // Returning true prevents the main factory loop from exiting prematurely.
         return true;
     }
 
@@ -115,6 +126,8 @@ final class WorkHandler implements WorkHandlerInterface
             $callback = $queue->dequeue();
             $callback();
             $workDone = true;
+            
+            // Microtasks can be queued by setImmediate callbacks
             $this->processTicksAndMicrotasks();
         }
 

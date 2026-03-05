@@ -321,30 +321,6 @@ final class Loop
     }
 
     /**
-     * Add a file watcher
-     *
-     * @param  string  $path  File path to watch
-     * @param  callable  $callback  Function to execute when file changes
-     * @param  array<string, mixed>  $options  Watcher options
-     * @return string Unique identifier for the file watcher
-     */
-    public static function addFileWatcher(string $path, callable $callback, array $options = []): string
-    {
-        return self::getInstance()->addFileWatcher($path, $callback, $options);
-    }
-
-    /**
-     * Remove a file watcher
-     *
-     * @param  string  $watcherId  The watcher ID returned by addFileWatcher()
-     * @return bool True if watcher was removed, false if not found
-     */
-    public static function removeFileWatcher(string $watcherId): bool
-    {
-        return self::getInstance()->removeFileWatcher($watcherId);
-    }
-
-    /**
      * Resets the singleton instance. Primarily for testing purposes.
      */
     public static function reset(): void

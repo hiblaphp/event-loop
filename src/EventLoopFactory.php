@@ -10,7 +10,6 @@ use Hibla\EventLoop\Handlers\ActivityHandler;
 use Hibla\EventLoop\Handlers\StateHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
@@ -43,8 +42,6 @@ final class EventLoopFactory implements LoopInterface
 
     private StateHandler $stateHandler;
 
-    private FileWatcherManagerInterface $fileManager;
-
     private SignalManagerInterface $signalManager;
 
     /**
@@ -67,7 +64,6 @@ final class EventLoopFactory implements LoopInterface
         $this->stateHandler = new StateHandler();
 
         $this->timerManager = EventLoopComponentFactory::createTimerManager($this->loopResource);
-        $this->fileManager = EventLoopComponentFactory::createFileWatcherManager($this->loopResource);
         $this->streamManager = EventLoopComponentFactory::createStreamManager($this->loopResource);
         $this->signalManager = EventLoopComponentFactory::createSignalManager($this->loopResource);
 
@@ -78,7 +74,6 @@ final class EventLoopFactory implements LoopInterface
             streamManager: $this->streamManager,
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
-            fileWatcherManager: $this->fileManager,
             signalManager: $this->signalManager,
         );
 
@@ -88,7 +83,6 @@ final class EventLoopFactory implements LoopInterface
             fiberManager: $this->fiberManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
-            fileWatcherManager: $this->fileManager,
         );
 
         $this->registerAutoRun();
@@ -326,22 +320,6 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * @inheritDoc
-     */
-    public function addFileWatcher(string $path, callable $callback, array $options = []): string
-    {
-        return $this->fileManager->addFileWatcher($path, $callback, $options);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function removeFileWatcher(string $watcherId): bool
-    {
-        return $this->fileManager->removeFileWatcher($watcherId);
-    }
-
-    /**
      * Handle graceful shutdown with fallback to forced shutdown.
      */
     private function handleGracefulShutdown(): void
@@ -385,7 +363,6 @@ final class EventLoopFactory implements LoopInterface
         $this->tickHandler->clearAllCallbacks();
         $this->timerManager->clearAllTimers();
         $this->httpRequestManager->clearAllRequests();
-        $this->fileManager->clearAllWatchers();
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
         $this->signalManager->clearAllSignals();

@@ -6,7 +6,6 @@ namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
@@ -54,7 +53,6 @@ final class WorkHandler implements WorkHandlerInterface
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
-        private FileWatcherManagerInterface $fileWatcherManager,
         private SignalManagerInterface $signalManager,
     ) {
     }
@@ -64,7 +62,6 @@ final class WorkHandler implements WorkHandlerInterface
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
@@ -103,8 +100,7 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         $hasIO = $this->httpRequestManager->hasRequests()
-            || $this->streamManager->hasWatchers()
-            || $this->fileWatcherManager->hasWatchers();
+            || $this->streamManager->hasWatchers();
 
         if ($hasIO) {
             if ($this->processIOOperations()) {
@@ -135,7 +131,6 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -247,10 +242,6 @@ final class WorkHandler implements WorkHandlerInterface
             if ($this->streamManager->processStreams($this->calculateStreamTimeout())) {
                 $workDone = true;
             }
-        }
-
-        if ($this->fileWatcherManager->processWatchers()) {
-            $workDone = true;
         }
 
         return $workDone;
