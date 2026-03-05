@@ -20,7 +20,6 @@ use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 use Hibla\EventLoop\Managers\FiberManager;
 use Hibla\EventLoop\Managers\HttpRequestManager;
-use Hibla\EventLoop\Managers\SignalManager;
 
 final class EventLoopFactory implements LoopInterface
 {
@@ -57,12 +56,12 @@ final class EventLoopFactory implements LoopInterface
         $this->timerManager = EventLoopComponentFactory::createTimerManager();
         $this->fileManager = EventLoopComponentFactory::createFileWatcherManager();
         $this->streamManager = EventLoopComponentFactory::createStreamManager();
+        $this->signalManager = EventLoopComponentFactory::createSignalManager();
         $this->httpRequestManager = new HttpRequestManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
-        $this->signalManager = new SignalManager();
 
         $this->workHandler = EventLoopComponentFactory::createWorkHandler(
             timerManager: $this->timerManager,

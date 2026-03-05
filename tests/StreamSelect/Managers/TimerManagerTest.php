@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\Managers\TimerManager;
+use Hibla\EventLoop\StreamSelect\Managers\TimerManager;
 
 describe('TimerManager', function () {
     it('starts with no timers', function () {

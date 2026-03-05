@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\Managers\StreamManager;
+use Hibla\EventLoop\StreamSelect\Managers\StreamManager;
 
 describe('StreamManager', function () {
     it('starts with no watchers', function () {
