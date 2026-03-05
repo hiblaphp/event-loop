@@ -95,28 +95,6 @@ final class TickHandler
         return $processed;
     }
 
-    public function processImmediateCallbacks(): bool
-    {
-        if ($this->immediateCallbacks->isEmpty()) {
-            return false;
-        }
-
-        $processed = false;
-        $count = $this->immediateCallbacks->count();
-
-        for ($i = 0; $i < $count; $i++) {
-            if ($this->immediateCallbacks->isEmpty()) {
-                break;
-            }
-
-            $callback = $this->immediateCallbacks->dequeue();
-            $callback();
-            $processed = true;
-        }
-
-        return $processed;
-    }
-
     public function processDeferredCallbacks(): bool
     {
         if ($this->deferredCallbacks->isEmpty()) {
