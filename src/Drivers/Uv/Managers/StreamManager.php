@@ -174,8 +174,10 @@ final class StreamManager implements StreamManagerInterface
     public function clearAllWatchers(): void
     {
         foreach ($this->uvHandles as $handle) {
-            @\uv_poll_stop($handle);
-            \uv_close($handle);
+            if (uv_is_active($handle)) {
+                uv_poll_stop($handle);
+            }
+            uv_close($handle);
         }
 
         $this->uvHandles = [];
@@ -220,19 +222,18 @@ final class StreamManager implements StreamManagerInterface
         }
 
         if ($flags === 0) {
-            // No watchers left for this stream, kill the UV handle
             if (isset($this->uvHandles[$streamId])) {
                 $handle = $this->uvHandles[$streamId];
-                @\uv_poll_stop($handle);
-                \uv_close($handle);
+                if (uv_is_active($handle)) {
+                    uv_poll_stop($handle);
+                }
+                uv_close($handle);
                 unset($this->uvHandles[$streamId]);
             }
             return;
         }
 
-        // We have watchers, ensure the handle exists
         if (!isset($this->uvHandles[$streamId])) {
-            // Recover stream resource from our index
             $stream = null;
             foreach ($this->watcherIndex as $meta) {
                 if ($meta['streamId'] === $streamId) {
@@ -242,14 +243,32 @@ final class StreamManager implements StreamManagerInterface
             }
 
             if ($stream === null || !is_resource($stream)) {
-                // Failsafe: if resource is dead, cleanup
                 return;
             }
 
-            $this->uvHandles[$streamId] = \uv_poll_init_socket($this->uvLoop, $stream);
+            $handle = uv_poll_init_socket($this->uvLoop, $stream);
+
+            // uv_poll_init_socket() returns false if the stream is not a valid
+            // socket (e.g. a plain file stream). Fall back to uv_poll_init().
+            if ($handle === false) {
+                $handle = uv_poll_init($this->uvLoop, $stream);
+            }
+
+            // If both fail the stream is dead — clean up and bail.
+            if ($handle === false) {
+                unset($this->readWatchers[$streamId]);
+                unset($this->writeWatchers[$streamId]);
+                foreach ($this->watcherIndex as $watcherId => $meta) {
+                    if ($meta['streamId'] === $streamId) {
+                        unset($this->watcherIndex[$watcherId]);
+                    }
+                }
+                return;
+            }
+
+            $this->uvHandles[$streamId] = $handle;
         }
 
-        // Apply the updated flags
-        \uv_poll_start($this->uvHandles[$streamId], $flags, $this->pollCallback);
+        uv_poll_start($this->uvHandles[$streamId], $flags, $this->pollCallback);
     }
 }

@@ -220,22 +220,26 @@ describe('EventLoop Integration', function () {
 
     it('processes stream watchers', function () {
         $loop = EventLoopFactory::getInstance();
-        $stream = createTestStream();
         $read = false;
 
-        fwrite($stream, 'test data');
-        rewind($stream);
+        [$client, $serverConnection] = createTcpSocketPair();
 
-        $watcherId = $loop->addReadWatcher($stream, function () use (&$read) {
+        stream_set_blocking($client, false);
+        stream_set_blocking($serverConnection, false);
+
+        fwrite($serverConnection, 'test data');
+
+        $watcherId = $loop->addReadWatcher($client, function () use (&$read) {
             $read = true;
         });
 
-        runLoopFor(0.01);
+        runLoopFor(0.05);
 
         expect($read)->toBeTrue();
 
         $loop->removeReadWatcher($watcherId);
-        fclose($stream);
+        fclose($client);
+        fclose($serverConnection);
     });
 
     it('handles fiber execution', function () {

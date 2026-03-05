@@ -23,8 +23,8 @@ describe('EventLoop Shutdown', function () {
     it('handles force shutdown', function () {
         $loop = EventLoopFactory::getInstance();
 
-        $loop->addTimer(10.0, fn () => null);
-        $loop->addPeriodicTimer(0.1, fn () => null);
+        $loop->addTimer(10.0, fn() => null);
+        $loop->addPeriodicTimer(0.1, fn() => null);
 
         expect($loop->hasTimers())->toBeTrue();
 
@@ -36,12 +36,13 @@ describe('EventLoop Shutdown', function () {
     it('cleans up resources on shutdown', function () {
         $loop = EventLoopFactory::getInstance();
 
-        $loop->addTimer(1.0, fn () => null);
-        $loop->nextTick(fn () => null);
-        $loop->defer(fn () => null);
+        $loop->addTimer(1.0, fn() => null);
+        $loop->nextTick(fn() => null);
+        $loop->defer(fn() => null);
 
-        $stream = createTestStream();
-        $loop->addReadWatcher($stream, fn () => null);
+        [$client, $serverConnection] = createTcpSocketPair();
+        stream_set_blocking($client, false);
+        $loop->addReadWatcher($client, fn() => null);
 
         expect($loop->hasTimers())->toBeTrue();
 
@@ -49,7 +50,8 @@ describe('EventLoop Shutdown', function () {
 
         expect($loop->isRunning())->toBeFalse();
 
-        fclose($stream);
+        fclose($client);
+        fclose($serverConnection);
     });
 
     it('handles shutdown with pending HTTP requests', function () {
