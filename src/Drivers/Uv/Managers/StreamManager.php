@@ -11,14 +11,19 @@ use InvalidArgumentException;
 final class StreamManager implements StreamManagerInterface
 {
     /**
-     * @var resource 
+     * @var resource
      */
     private $uvLoop;
 
     /**
-     * @var array<int, resource> Map of streamId to uv_poll resource
+     * @var array<int, resource> Map of streamId => uv_poll handle
      */
     private array $uvHandles = [];
+
+    /**
+     * @var array<int, resource> Map of streamId => stream resource
+     */
+    private array $streamResources = [];
 
     /**
      * @var array<int, array<string, StreamWatcher>>
@@ -36,7 +41,7 @@ final class StreamManager implements StreamManagerInterface
     private array $watcherIndex = [];
 
     /**
-     * Shared callback for all stream events
+     * Shared callback for all stream events.
      */
     private \Closure $pollCallback;
 
@@ -44,25 +49,20 @@ final class StreamManager implements StreamManagerInterface
     {
         $this->uvLoop = $uvLoop;
 
-        // Shared callback handles routing LibUV events back to the PHP objects
-        $this->pollCallback = function ($handle, $status, $events, $stream) {
+        $this->pollCallback = function ($handle, $status, $events, $stream): void {
             $streamId = (int) $stream;
 
-            // LibUV stops polling automatically on error.
-            // force read/write flags so the user's callback triggers and can handle EOF/errors via fread/fwrite.
             if ($status !== 0) {
                 $events = \UV::READABLE | \UV::WRITABLE;
             }
 
-            // Route READ events
-            if (($events & \UV::READABLE) && !empty($this->readWatchers[$streamId])) {
+            if (($events & \UV::READABLE) && \count($this->readWatchers[$streamId] ?? []) > 0) {
                 foreach ($this->readWatchers[$streamId] as $watcher) {
                     $watcher->execute();
                 }
             }
 
-            // Route WRITE events
-            if (($events & \UV::WRITABLE) && !empty($this->writeWatchers[$streamId])) {
+            if (($events & \UV::WRITABLE) && \count($this->writeWatchers[$streamId] ?? []) > 0) {
                 foreach ($this->writeWatchers[$streamId] as $watcher) {
                     $watcher->execute();
                 }
@@ -118,7 +118,6 @@ final class StreamManager implements StreamManagerInterface
         return $this->removeStreamWatcher($watcherId);
     }
 
-
     /**
      * {@inheritDoc}
      */
@@ -128,23 +127,29 @@ final class StreamManager implements StreamManagerInterface
             return false;
         }
 
-        $meta = $this->watcherIndex[$watcherId];
+        $meta     = $this->watcherIndex[$watcherId];
         $streamId = $meta['streamId'];
-        $type = $meta['type'];
+        $type     = $meta['type'];
 
         if ($type === StreamWatcher::TYPE_READ) {
             unset($this->readWatchers[$streamId][$watcherId]);
-            if (empty($this->readWatchers[$streamId])) {
+            if (\count($this->readWatchers[$streamId]) === 0) {
                 unset($this->readWatchers[$streamId]);
             }
         } else {
             unset($this->writeWatchers[$streamId][$watcherId]);
-            if (empty($this->writeWatchers[$streamId])) {
+            if (\count($this->writeWatchers[$streamId]) === 0) {
                 unset($this->writeWatchers[$streamId]);
             }
         }
 
         unset($this->watcherIndex[$watcherId]);
+
+        if (\count($this->readWatchers[$streamId] ?? []) === 0
+            && \count($this->writeWatchers[$streamId] ?? []) === 0
+        ) {
+            unset($this->streamResources[$streamId]);
+        }
 
         $this->updatePollState($streamId);
 
@@ -153,7 +158,7 @@ final class StreamManager implements StreamManagerInterface
 
     /**
      * {@inheritDoc}
-     *  No-op: LibUV handles execution via the pollCallback inside uv_run()
+     * No-op: LibUV drives execution via pollCallback inside uv_run().
      */
     public function processStreams(int $timeoutMicroseconds = 200_000): bool
     {
@@ -165,7 +170,7 @@ final class StreamManager implements StreamManagerInterface
      */
     public function hasWatchers(): bool
     {
-        return !empty($this->readWatchers) || !empty($this->writeWatchers);
+        return \count($this->readWatchers) > 0 || \count($this->writeWatchers) > 0;
     }
 
     /**
@@ -174,23 +179,29 @@ final class StreamManager implements StreamManagerInterface
     public function clearAllWatchers(): void
     {
         foreach ($this->uvHandles as $handle) {
-            if (uv_is_active($handle)) {
-                uv_poll_stop($handle);
+            if (\uv_is_active($handle)) {
+                \uv_poll_stop($handle);
             }
-            uv_close($handle);
+            \uv_close($handle);
         }
 
-        $this->uvHandles = [];
-        $this->readWatchers = [];
-        $this->writeWatchers = [];
-        $this->watcherIndex = [];
+        $this->uvHandles       = [];
+        $this->streamResources = [];
+        $this->readWatchers    = [];
+        $this->writeWatchers   = [];
+        $this->watcherIndex    = [];
     }
 
+    /**
+     * @param resource $stream
+     */
     private function addStreamWatcher($stream, callable $callback, string $type): string
     {
-        $watcher = new StreamWatcher($stream, $callback, $type);
-        $streamId = (int) $stream;
+        $watcher   = new StreamWatcher($stream, $callback, $type);
+        $streamId  = (int) $stream;
         $watcherId = $watcher->getId();
+
+        $this->streamResources[$streamId] = $stream;
 
         if ($type === StreamWatcher::TYPE_READ) {
             $this->readWatchers[$streamId][$watcherId] = $watcher;
@@ -199,9 +210,8 @@ final class StreamManager implements StreamManagerInterface
         }
 
         $this->watcherIndex[$watcherId] = [
-            'type' => $type,
+            'type'     => $type,
             'streamId' => $streamId,
-            'stream' => $stream, // Store reference for uv_poll_init_socket
         ];
 
         $this->updatePollState($streamId);
@@ -213,62 +223,64 @@ final class StreamManager implements StreamManagerInterface
     {
         $flags = 0;
 
-        if (!empty($this->readWatchers[$streamId])) {
+        if (\count($this->readWatchers[$streamId] ?? []) > 0) {
             $flags |= \UV::READABLE;
         }
 
-        if (!empty($this->writeWatchers[$streamId])) {
+        if (\count($this->writeWatchers[$streamId] ?? []) > 0) {
             $flags |= \UV::WRITABLE;
         }
 
         if ($flags === 0) {
             if (isset($this->uvHandles[$streamId])) {
                 $handle = $this->uvHandles[$streamId];
-                if (uv_is_active($handle)) {
-                    uv_poll_stop($handle);
+                if (\uv_is_active($handle)) {
+                    \uv_poll_stop($handle);
                 }
-                uv_close($handle);
+                \uv_close($handle);
                 unset($this->uvHandles[$streamId]);
             }
+
             return;
         }
 
-        if (!isset($this->uvHandles[$streamId])) {
-            $stream = null;
-            foreach ($this->watcherIndex as $meta) {
-                if ($meta['streamId'] === $streamId) {
-                    $stream = $meta['stream'];
-                    break;
-                }
-            }
+        if (! isset($this->uvHandles[$streamId])) {
+            $stream = $this->streamResources[$streamId] ?? null;
 
-            if ($stream === null || !is_resource($stream)) {
+            if ($stream === null || ! \is_resource($stream)) {
+                $this->cleanupDeadStream($streamId);
+
                 return;
             }
 
-            $handle = uv_poll_init_socket($this->uvLoop, $stream);
+            $handle = \uv_poll_init_socket($this->uvLoop, $stream);
 
-            // uv_poll_init_socket() returns false if the stream is not a valid
-            // socket (e.g. a plain file stream). Fall back to uv_poll_init().
             if ($handle === false) {
-                $handle = uv_poll_init($this->uvLoop, $stream);
+                $handle = \uv_poll_init($this->uvLoop, $stream);
             }
 
-            // If both fail the stream is dead — clean up and bail.
             if ($handle === false) {
-                unset($this->readWatchers[$streamId]);
-                unset($this->writeWatchers[$streamId]);
-                foreach ($this->watcherIndex as $watcherId => $meta) {
-                    if ($meta['streamId'] === $streamId) {
-                        unset($this->watcherIndex[$watcherId]);
-                    }
-                }
+                $this->cleanupDeadStream($streamId);
+
                 return;
             }
 
             $this->uvHandles[$streamId] = $handle;
         }
 
-        uv_poll_start($this->uvHandles[$streamId], $flags, $this->pollCallback);
+        \uv_poll_start($this->uvHandles[$streamId], $flags, $this->pollCallback);
+    }
+
+    private function cleanupDeadStream(int $streamId): void
+    {
+        unset($this->readWatchers[$streamId]);
+        unset($this->writeWatchers[$streamId]);
+        unset($this->streamResources[$streamId]);
+
+        foreach ($this->watcherIndex as $watcherId => $meta) {
+            if ($meta['streamId'] === $streamId) {
+                unset($this->watcherIndex[$watcherId]);
+            }
+        }
     }
 }
