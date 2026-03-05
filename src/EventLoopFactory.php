@@ -47,23 +47,32 @@ final class EventLoopFactory implements LoopInterface
 
     private SignalManagerInterface $signalManager;
 
+    /**
+     * @var mixed The underlying loop resource (e.g., uv_loop), or null if native PHP.
+     */
+    private mixed $loopResource;
+
     private bool $hasStarted = false;
     private static bool $autoRunRegistered = false;
     private static bool $explicitlyStopped = false;
 
     private function __construct()
     {
-        $this->timerManager = EventLoopComponentFactory::createTimerManager();
-        $this->fileManager = EventLoopComponentFactory::createFileWatcherManager();
-        $this->streamManager = EventLoopComponentFactory::createStreamManager();
-        $this->signalManager = EventLoopComponentFactory::createSignalManager();
+        $this->loopResource = EventLoopComponentFactory::createLoopResource();
+
         $this->httpRequestManager = new HttpRequestManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
 
+        $this->timerManager = EventLoopComponentFactory::createTimerManager($this->loopResource);
+        $this->fileManager = EventLoopComponentFactory::createFileWatcherManager($this->loopResource);
+        $this->streamManager = EventLoopComponentFactory::createStreamManager($this->loopResource);
+        $this->signalManager = EventLoopComponentFactory::createSignalManager($this->loopResource);
+
         $this->workHandler = EventLoopComponentFactory::createWorkHandler(
+            loopResource: $this->loopResource,
             timerManager: $this->timerManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
@@ -74,6 +83,7 @@ final class EventLoopFactory implements LoopInterface
         );
 
         $this->sleepHandler = EventLoopComponentFactory::createSleepHandler(
+            loopResource: $this->loopResource,
             timerManager: $this->timerManager,
             fiberManager: $this->fiberManager,
             httpRequestManager: $this->httpRequestManager,
