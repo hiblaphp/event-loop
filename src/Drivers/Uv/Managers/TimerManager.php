@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Drivers\Uv\Managers;
 
-use Hibla\EventLoop\Interfaces\TimerManagerInterface;
+use Hibla\EventLoop\Interfaces\UvTimerManagerInterface;
 use Hibla\EventLoop\ValueObjects\PeriodicTimer;
 use Hibla\EventLoop\ValueObjects\Timer;
 use SplPriorityQueue;
 
-final class TimerManager implements TimerManagerInterface
+final class TimerManager implements UvTimerManagerInterface
 {
     /**
      * @var resource
