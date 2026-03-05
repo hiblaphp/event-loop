@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Handlers;
 
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
@@ -23,7 +23,7 @@ final class SleepHandler implements SleepHandlerInterface
         private FiberManagerInterface $fiberManager,
         private HttpRequestManagerInterface $httpRequestManager,
         private StreamManagerInterface $streamManager,
-        private FileManagerInterface $fileManager,
+        private FileWatcherManagerInterface $fileWatcherManager,
     ) {
     }
 
@@ -39,7 +39,7 @@ final class SleepHandler implements SleepHandlerInterface
 
         $hasWaitingIO = $this->httpRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
-            || $this->fileManager->hasWork();
+            || $this->fileWatcherManager->hasWatchers();
 
         if ($hasWaitingIO) {
             return false;

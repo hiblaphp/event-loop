@@ -41,11 +41,12 @@ final class FileWatcher
         $this->id = uniqid('watcher_', true);
         $this->path = $path;
         $this->callback = $callback;
-        $this->options = array_merge([
+        $this->options = [
             'polling_interval' => 0.1, // Default 100ms for faster detection
             'watch_size' => true,       // Watch file size changes
             'watch_content' => false,   // Watch content hash (expensive)
-        ], $options);
+            ...$options,
+        ];
 
         // Initialize with current file state
         if (file_exists($path)) {

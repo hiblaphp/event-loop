@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Handlers;
 
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
@@ -53,7 +53,7 @@ final class WorkHandler implements WorkHandlerInterface
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
-        private FileManagerInterface $fileManager,
+        private FileWatcherManagerInterface $fileWatcherManager,
         private SignalManagerInterface $signalManager,
     ) {
     }
@@ -63,7 +63,7 @@ final class WorkHandler implements WorkHandlerInterface
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileManager->hasWork()
+            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
@@ -103,7 +103,7 @@ final class WorkHandler implements WorkHandlerInterface
 
         $hasIO = $this->httpRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
-            || $this->fileManager->hasWork();
+            || $this->fileWatcherManager->hasWatchers();
 
         if ($hasIO) {
             if ($this->processIOOperations()) {
@@ -134,7 +134,7 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileManager->hasWork()
+            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -248,7 +248,7 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        if ($this->fileManager->processFileOperations()) {
+        if ($this->fileWatcherManager->processWatchers()) {
             $workDone = true;
         }
 

@@ -8,14 +8,14 @@ use Hibla\EventLoop\Handlers\SleepHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Handlers\WorkHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
-use Hibla\EventLoop\Managers\FileManager;
+use Hibla\EventLoop\Managers\FileWatcherManager;
 use Hibla\EventLoop\Managers\StreamManager;
 use Hibla\EventLoop\Managers\TimerManager;
 
@@ -27,17 +27,16 @@ final class EventLoopComponentFactory
         StreamManagerInterface $streamManager,
         FiberManagerInterface $fiberManager,
         TickHandler $tickHandler,
-        FileManagerInterface $fileManager,
+        FileWatcherManagerInterface $fileWatcherManager,
         SignalManagerInterface $signalManager,
     ): WorkHandlerInterface {
-
         return new WorkHandler(
             $timerManager,
             $httpRequestManager,
             $streamManager,
             $fiberManager,
             $tickHandler,
-            $fileManager,
+            $fileWatcherManager,
             $signalManager,
         );
     }
@@ -47,9 +46,15 @@ final class EventLoopComponentFactory
         FiberManagerInterface $fiberManager,
         HttpRequestManagerInterface $httpRequestManager,
         StreamManagerInterface $streamManager,
-        FileManagerInterface $fileManager,
+        FileWatcherManagerInterface $fileWatcherManager,
     ): SleepHandlerInterface {
-        return new SleepHandler($timerManager, $fiberManager, $httpRequestManager, $streamManager, $fileManager);
+        return new SleepHandler(
+            $timerManager,
+            $fiberManager,
+            $httpRequestManager,
+            $streamManager,
+            $fileWatcherManager
+        );
     }
 
     public static function createTimerManager(): TimerManagerInterface
@@ -62,8 +67,8 @@ final class EventLoopComponentFactory
         return new StreamManager();
     }
 
-    public static function createFileManager(): FileManagerInterface
+    public static function createFileWatcherManager(): FileWatcherManagerInterface
     {
-        return new FileManager();
+        return new FileWatcherManager();
     }
 }

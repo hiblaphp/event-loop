@@ -10,7 +10,7 @@ use Hibla\EventLoop\Handlers\ActivityHandler;
 use Hibla\EventLoop\Handlers\StateHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileManagerInterface;
+use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
@@ -44,7 +44,7 @@ final class EventLoopFactory implements LoopInterface
 
     private StateHandler $stateHandler;
 
-    private FileManagerInterface $fileManager;
+    private FileWatcherManagerInterface $fileManager;
 
     private SignalManagerInterface $signalManager;
 
@@ -55,7 +55,7 @@ final class EventLoopFactory implements LoopInterface
     private function __construct()
     {
         $this->timerManager = EventLoopComponentFactory::createTimerManager();
-        $this->fileManager = EventLoopComponentFactory::createFileManager();
+        $this->fileManager = EventLoopComponentFactory::createFileWatcherManager();
         $this->streamManager = EventLoopComponentFactory::createStreamManager();
         $this->httpRequestManager = new HttpRequestManager();
         $this->fiberManager = new FiberManager();
@@ -70,7 +70,7 @@ final class EventLoopFactory implements LoopInterface
             streamManager: $this->streamManager,
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
-            fileManager: $this->fileManager,
+            fileWatcherManager: $this->fileManager,
             signalManager: $this->signalManager,
         );
 
@@ -79,7 +79,7 @@ final class EventLoopFactory implements LoopInterface
             fiberManager: $this->fiberManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
-            fileManager: $this->fileManager,
+            fileWatcherManager: $this->fileManager,
         );
 
         $this->registerAutoRun();
@@ -319,27 +319,6 @@ final class EventLoopFactory implements LoopInterface
     /**
      * @inheritDoc
      */
-    public function addFileOperation(
-        string $type,
-        string $path,
-        mixed $data,
-        callable $callback,
-        array $options = []
-    ): string {
-        return $this->fileManager->addFileOperation($type, $path, $data, $callback, $options);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function cancelFileOperation(string $operationId): bool
-    {
-        return $this->fileManager->cancelFileOperation($operationId);
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function addFileWatcher(string $path, callable $callback, array $options = []): string
     {
         return $this->fileManager->addFileWatcher($path, $callback, $options);
@@ -397,7 +376,7 @@ final class EventLoopFactory implements LoopInterface
         $this->tickHandler->clearAllCallbacks();
         $this->timerManager->clearAllTimers();
         $this->httpRequestManager->clearAllRequests();
-        $this->fileManager->clearAllOperations();
+        $this->fileManager->clearAllWatchers();
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
         $this->signalManager->clearAllSignals();

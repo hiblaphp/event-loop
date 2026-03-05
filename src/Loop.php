@@ -321,37 +321,6 @@ final class Loop
     }
 
     /**
-     * Schedule an asynchronous file operation
-     *
-     * @param  string  $type  Type of file operation
-     * @param  string  $path  File path
-     * @param  mixed  $data  Data for the operation
-     * @param  callable  $callback  Function to execute when operation completes
-     * @param  array<string, mixed>  $options  Additional options
-     * @return string Unique identifier for the file operation
-     */
-    public static function addFileOperation(
-        string $type,
-        string $path,
-        mixed $data,
-        callable $callback,
-        array $options = []
-    ): string {
-        return self::getInstance()->addFileOperation($type, $path, $data, $callback, $options);
-    }
-
-    /**
-     * Cancel a file operation
-     *
-     * @param  string  $operationId  The operation ID returned by addFileOperation()
-     * @return bool True if operation was cancelled, false if not found
-     */
-    public static function cancelFileOperation(string $operationId): bool
-    {
-        return self::getInstance()->cancelFileOperation($operationId);
-    }
-
-    /**
      * Add a file watcher
      *
      * @param  string  $path  File path to watch

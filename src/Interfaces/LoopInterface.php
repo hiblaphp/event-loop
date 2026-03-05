@@ -102,32 +102,6 @@ interface LoopInterface
     public function removeWriteWatcher(string $watcherId): bool;
 
     /**
-     * Schedule an asynchronous file operation.
-     *
-     * @param  string  $type  Type of operation (read, write, append, etc.)
-     * @param  string  $path  File path
-     * @param  mixed  $data  Data for write operations
-     * @param  callable  $callback  Function to execute when operation completes
-     * @param  array<string, mixed>  $options  Additional options for the operation
-     * @return string Unique identifier for the file operation
-     */
-    public function addFileOperation(
-        string $type,
-        string $path,
-        mixed $data,
-        callable $callback,
-        array $options = []
-    ): string;
-
-    /**
-     * Cancel a file operation.
-     *
-     * @param  string  $operationId  The operation ID returned by addFileOperation()
-     * @return bool True if operation was cancelled, false if not found
-     */
-    public function cancelFileOperation(string $operationId): bool;
-
-    /**
      * Add a file watcher to monitor file changes.
      *
      * @param  string  $path  Path to watch
