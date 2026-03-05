@@ -211,7 +211,9 @@ final class TimerManager implements TimerManagerInterface
      */
     public function clearAllTimers(): void
     {
-        @\uv_timer_stop($this->masterTimer);
+        if (uv_is_active($this->masterTimer)) {
+            uv_timer_stop($this->masterTimer);
+        }
 
         $this->timers = [];
         $this->timerQueue = new SplPriorityQueue();
@@ -221,19 +223,24 @@ final class TimerManager implements TimerManagerInterface
 
     private function scheduleMasterTimer(): void
     {
-        @\uv_timer_stop($this->masterTimer);
+        // Only stop if libuv considers the handle currently active.
+        // A one-shot timer (repeat=0) is automatically stopped by libuv
+        // after it fires, so calling uv_timer_stop() again would trigger
+        // the "already stopped" notice.
+        if (uv_is_active($this->masterTimer)) {
+            uv_timer_stop($this->masterTimer);
+        }
 
         $nextDelay = $this->getNextTimerDelay();
 
         if ($nextDelay !== null) {
-            // Use ceil to ensure we don't wake up 0.9ms early and spin
             $delayMs = (int) ceil($nextDelay * 1000);
 
             if ($delayMs < 0) {
                 $delayMs = 0;
             }
 
-            \uv_timer_start($this->masterTimer, $delayMs, 0, $this->masterCallback);
+            uv_timer_start($this->masterTimer, $delayMs, 0, $this->masterCallback);
         }
     }
 }
