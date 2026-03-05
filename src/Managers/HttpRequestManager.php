@@ -13,7 +13,7 @@ use RuntimeException;
 final class HttpRequestManager implements HttpRequestManagerInterface
 {
     /**
-     * @var list<HttpRequest>
+     * @var array<string, HttpRequest>
      */
     private array $pendingRequests = [];
 
@@ -42,7 +42,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         $request = new HttpRequest($url, $options, $callback);
         $requestId = spl_object_hash($request);
 
-        $this->pendingRequests[] = $request;
+        $this->pendingRequests[$requestId] = $request;
         $this->requestsById[$requestId] = $request;
 
         return $requestId;
@@ -53,20 +53,15 @@ final class HttpRequestManager implements HttpRequestManagerInterface
      */
     public function cancelHttpRequest(string $requestId): bool
     {
-        if (! isset($this->requestsById[$requestId])) {
+        if (!isset($this->requestsById[$requestId])) {
             return false;
         }
 
         $request = $this->requestsById[$requestId];
 
-        $this->pendingRequests = array_values(
-            array_filter(
-                $this->pendingRequests,
-                static fn (HttpRequest $r): bool => spl_object_hash($r) !== $requestId
-            )
-        );
+        unset($this->pendingRequests[$requestId]);
 
-        $handle = $request->getHandle();
+        $handle   = $request->getHandle();
         $handleId = (int) $handle;
 
         if (isset($this->activeRequests[$handleId])) {
