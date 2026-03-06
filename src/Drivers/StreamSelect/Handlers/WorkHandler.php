@@ -6,7 +6,6 @@ namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
@@ -54,7 +53,6 @@ final class WorkHandler implements WorkHandlerInterface
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
-        private FileWatcherManagerInterface $fileWatcherManager,
         private SignalManagerInterface $signalManager,
     ) {
     }
@@ -64,13 +62,15 @@ final class WorkHandler implements WorkHandlerInterface
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
     }
 
     /**
+     *
+     * {@inheritDoc}
+     *
      * Process one full cycle of work following Node.js event loop semantics:
      * 1. Signal Handling
      * 2. NextTick callbacks (highest priority)
@@ -86,7 +86,7 @@ final class WorkHandler implements WorkHandlerInterface
      *
      * NOTE: ticks + microtasks are drained after every phase transition
      */
-    public function processWork(): bool
+    public function processWork(bool $blocking = true): bool
     {
         $workDone = false;
 
@@ -103,11 +103,10 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         $hasIO = $this->httpRequestManager->hasRequests()
-            || $this->streamManager->hasWatchers()
-            || $this->fileWatcherManager->hasWatchers();
+            || $this->streamManager->hasWatchers();
 
         if ($hasIO) {
-            if ($this->processIOOperations()) {
+            if ($this->processIOOperations($blocking)) {
                 $workDone = true;
                 $this->processTicksAndMicrotasks();
             }
@@ -135,7 +134,6 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
             || $this->httpRequestManager->hasRequests()
-            || $this->fileWatcherManager->hasWatchers()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -233,9 +231,10 @@ final class WorkHandler implements WorkHandlerInterface
      * immediates), stream_select is given a zero timeout so it polls only
      * and returns instantly — matching ReactPHP's StreamSelectLoop behavior.
      *
+     * @param bool $blocking Whether to allow stream_select to block and wait for I/O
      * @return bool True if any I/O work was performed
      */
-    private function processIOOperations(): bool
+    private function processIOOperations(bool $blocking): bool
     {
         $workDone = false;
 
@@ -244,13 +243,11 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->streamManager->hasWatchers()) {
-            if ($this->streamManager->processStreams($this->calculateStreamTimeout())) {
+            $timeout = $blocking ? $this->calculateStreamTimeout() : 0;
+
+            if ($this->streamManager->processStreams($timeout)) {
                 $workDone = true;
             }
-        }
-
-        if ($this->fileWatcherManager->processWatchers()) {
-            $workDone = true;
         }
 
         return $workDone;

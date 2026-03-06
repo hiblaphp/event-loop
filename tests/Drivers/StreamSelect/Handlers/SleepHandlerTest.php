@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
 use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
-use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler;
 
 function makeStreamSelectSleepHandler(
     ?TimerManagerInterface $timerManager = null,
@@ -17,11 +17,10 @@ function makeStreamSelectSleepHandler(
     ?FileWatcherManagerInterface $fileWatcherManager = null,
 ): SleepHandler {
     return new SleepHandler(
-        $timerManager       ?? Mockery::mock(TimerManagerInterface::class),
-        $fiberManager       ?? Mockery::mock(FiberManagerInterface::class),
+        $timerManager ?? Mockery::mock(TimerManagerInterface::class),
+        $fiberManager ?? Mockery::mock(FiberManagerInterface::class),
         $httpRequestManager ?? Mockery::mock(HttpRequestManagerInterface::class),
-        $streamManager      ?? Mockery::mock(StreamManagerInterface::class),
-        $fileWatcherManager ?? Mockery::mock(FileWatcherManagerInterface::class),
+        $streamManager ?? Mockery::mock(StreamManagerInterface::class),
     );
 }
 
@@ -70,29 +69,6 @@ describe('SleepHandler::shouldSleep', function () {
             timerManager: $timerManager,
             httpRequestManager: $httpRequestManager,
             streamManager: $streamManager,
-        );
-
-        expect($handler->shouldSleep(false))->toBeFalse();
-    });
-
-    it('returns false when there are active file watchers', function () {
-        $timerManager = Mockery::mock(TimerManagerInterface::class);
-        $timerManager->allows('hasReadyTimers')->andReturn(false);
-
-        $httpRequestManager = Mockery::mock(HttpRequestManagerInterface::class);
-        $httpRequestManager->allows('hasRequests')->andReturn(false);
-
-        $streamManager = Mockery::mock(StreamManagerInterface::class);
-        $streamManager->allows('hasWatchers')->andReturn(false);
-
-        $fileWatcherManager = Mockery::mock(FileWatcherManagerInterface::class);
-        $fileWatcherManager->allows('hasWatchers')->andReturn(true);
-
-        $handler = makeStreamSelectSleepHandler(
-            timerManager: $timerManager,
-            httpRequestManager: $httpRequestManager,
-            streamManager: $streamManager,
-            fileWatcherManager: $fileWatcherManager,
         );
 
         expect($handler->shouldSleep(false))->toBeFalse();

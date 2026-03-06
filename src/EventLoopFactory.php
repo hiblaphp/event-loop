@@ -10,7 +10,6 @@ use Hibla\EventLoop\Handlers\ActivityHandler;
 use Hibla\EventLoop\Handlers\StateHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\FileWatcherManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
@@ -43,9 +42,12 @@ final class EventLoopFactory implements LoopInterface
 
     private StateHandler $stateHandler;
 
-    private FileWatcherManagerInterface $fileManager;
-
     private SignalManagerInterface $signalManager;
+
+    /**
+     * @var mixed The underlying loop resource (e.g., uv_loop), or null if native PHP.
+     */
+    private mixed $loopResource;
 
     private bool $hasStarted = false;
     private static bool $autoRunRegistered = false;
@@ -53,32 +55,34 @@ final class EventLoopFactory implements LoopInterface
 
     private function __construct()
     {
-        $this->timerManager = EventLoopComponentFactory::createTimerManager();
-        $this->fileManager = EventLoopComponentFactory::createFileWatcherManager();
-        $this->streamManager = EventLoopComponentFactory::createStreamManager();
-        $this->signalManager = EventLoopComponentFactory::createSignalManager();
+        $this->loopResource = EventLoopComponentFactory::createLoopResource();
+
         $this->httpRequestManager = new HttpRequestManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
         $this->activityHandler = new ActivityHandler();
         $this->stateHandler = new StateHandler();
 
+        $this->timerManager = EventLoopComponentFactory::createTimerManager($this->loopResource);
+        $this->streamManager = EventLoopComponentFactory::createStreamManager($this->loopResource);
+        $this->signalManager = EventLoopComponentFactory::createSignalManager($this->loopResource);
+
         $this->workHandler = EventLoopComponentFactory::createWorkHandler(
+            loopResource: $this->loopResource,
             timerManager: $this->timerManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
-            fileWatcherManager: $this->fileManager,
             signalManager: $this->signalManager,
         );
 
         $this->sleepHandler = EventLoopComponentFactory::createSleepHandler(
+            loopResource: $this->loopResource,
             timerManager: $this->timerManager,
             fiberManager: $this->fiberManager,
             httpRequestManager: $this->httpRequestManager,
             streamManager: $this->streamManager,
-            fileWatcherManager: $this->fileManager,
         );
 
         $this->registerAutoRun();
@@ -259,7 +263,7 @@ final class EventLoopFactory implements LoopInterface
      */
     public function runOnce(): void
     {
-        $hasImmediateWork = $this->tick();
+        $hasImmediateWork = $this->tick(true);
 
         if ($this->sleepHandler->shouldSleep($hasImmediateWork)) {
             $sleepTime = $this->sleepHandler->calculateOptimalSleep();
@@ -316,22 +320,6 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
-     * @inheritDoc
-     */
-    public function addFileWatcher(string $path, callable $callback, array $options = []): string
-    {
-        return $this->fileManager->addFileWatcher($path, $callback, $options);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function removeFileWatcher(string $watcherId): bool
-    {
-        return $this->fileManager->removeFileWatcher($watcherId);
-    }
-
-    /**
      * Handle graceful shutdown with fallback to forced shutdown.
      */
     private function handleGracefulShutdown(): void
@@ -345,7 +333,7 @@ final class EventLoopFactory implements LoopInterface
             ! $this->stateHandler->shouldForceShutdown()
         ) {
 
-            $this->tick();
+            $this->tick(false);
             $gracefulCount++;
 
             usleep(1000);
@@ -375,7 +363,6 @@ final class EventLoopFactory implements LoopInterface
         $this->tickHandler->clearAllCallbacks();
         $this->timerManager->clearAllTimers();
         $this->httpRequestManager->clearAllRequests();
-        $this->fileManager->clearAllWatchers();
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
         $this->signalManager->clearAllSignals();
@@ -410,11 +397,12 @@ final class EventLoopFactory implements LoopInterface
      * Executes all available work and updates activity tracking.
      * This is the core processing method called by the main run loop.
      *
+     * @param bool $blocking Whether the work handler is allowed to block for I/O
      * @return bool True if work was processed, false if no work was available
      */
-    private function tick(): bool
+    private function tick(bool $blocking = true): bool
     {
-        $workDone = $this->workHandler->processWork();
+        $workDone = $this->workHandler->processWork($blocking);
 
         if ($workDone) {
             $this->activityHandler->updateLastActivity();

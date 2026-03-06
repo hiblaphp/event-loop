@@ -53,7 +53,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
      */
     public function cancelHttpRequest(string $requestId): bool
     {
-        if (!isset($this->requestsById[$requestId])) {
+        if (! isset($this->requestsById[$requestId])) {
             return false;
         }
 
@@ -61,7 +61,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
 
         unset($this->pendingRequests[$requestId]);
 
-        $handle   = $request->getHandle();
+        $handle = $request->getHandle();
         $handleId = (int) $handle;
 
         if (isset($this->activeRequests[$handleId])) {

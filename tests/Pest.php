@@ -15,6 +15,11 @@ expect()->extend('toBeValidTimestamp', function () {
     ;
 });
 
+/**
+ * Creates a plain file stream (php://temp).
+ * NOT suitable for stream watcher tests — libuv cannot poll regular files.
+ * Use createTcpSocketPair() for anything involving addReadWatcher/addWriteWatcher.
+ */
 function createTestStream()
 {
     $stream = fopen('php://temp', 'r+');

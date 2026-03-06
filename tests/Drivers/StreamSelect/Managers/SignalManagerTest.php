@@ -43,7 +43,8 @@ describe('SignalManager', function () {
 
     it('removes signal listeners by id', function () {
         $signalManager = new SignalManager();
-        $callback = function () {};
+        $callback = function () {
+        };
 
         $signalId1 = $signalManager->addSignal(SIGUSR1, $callback);
         $signalId2 = $signalManager->addSignal(SIGUSR1, $callback);
@@ -97,7 +98,8 @@ describe('SignalManager', function () {
 
     it('clears all signal listeners', function () {
         $signalManager = new SignalManager();
-        $callback = function () {};
+        $callback = function () {
+        };
 
         $signalManager->addSignal(SIGUSR1, $callback);
         $signalManager->addSignal(SIGUSR2, $callback);
@@ -118,7 +120,8 @@ describe('SignalManager', function () {
 
     it('processes signals when hasSignals returns true', function () {
         $signalManager = new SignalManager();
-        $callback = function () {};
+        $callback = function () {
+        };
 
         expect($signalManager->processSignals())->toBeFalse();
 
@@ -137,7 +140,8 @@ describe('SignalManager', function () {
 
     it('generates unique ids for each listener', function () {
         $signalManager = new SignalManager();
-        $callback = function () {};
+        $callback = function () {
+        };
 
         $ids = [];
         for ($i = 0; $i < 10; $i++) {
@@ -153,7 +157,8 @@ describe('SignalManager', function () {
 
     it('maintains signal registration after removing some listeners', function () {
         $signalManager = new SignalManager();
-        $callback = function () {};
+        $callback = function () {
+        };
 
         $id1 = $signalManager->addSignal(SIGUSR1, $callback);
         $id2 = $signalManager->addSignal(SIGUSR1, $callback);
@@ -174,4 +179,4 @@ describe('SignalManager', function () {
             ->and($signalManager->hasSignals())->toBeFalse()
         ;
     });
-})->skip(fn() => ! function_exists('pcntl_signal'), 'pcntl extension required');
+})->skip(fn () => ! function_exists('pcntl_signal'), 'pcntl extension required');

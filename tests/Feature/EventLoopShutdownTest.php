@@ -40,8 +40,9 @@ describe('EventLoop Shutdown', function () {
         $loop->nextTick(fn () => null);
         $loop->defer(fn () => null);
 
-        $stream = createTestStream();
-        $loop->addReadWatcher($stream, fn () => null);
+        [$client, $serverConnection] = createTcpSocketPair();
+        stream_set_blocking($client, false);
+        $loop->addReadWatcher($client, fn () => null);
 
         expect($loop->hasTimers())->toBeTrue();
 
@@ -49,7 +50,8 @@ describe('EventLoop Shutdown', function () {
 
         expect($loop->isRunning())->toBeFalse();
 
-        fclose($stream);
+        fclose($client);
+        fclose($serverConnection);
     });
 
     it('handles shutdown with pending HTTP requests', function () {

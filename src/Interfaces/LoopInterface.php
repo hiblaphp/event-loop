@@ -102,24 +102,6 @@ interface LoopInterface
     public function removeWriteWatcher(string $watcherId): bool;
 
     /**
-     * Add a file watcher to monitor file changes.
-     *
-     * @param  string  $path  Path to watch
-     * @param  callable  $callback  Function to execute when file changes
-     * @param  array<string, mixed>  $options  Additional options for watching
-     * @return string Unique identifier for the file watcher
-     */
-    public function addFileWatcher(string $path, callable $callback, array $options = []): string;
-
-    /**
-     * Remove a file watcher.
-     *
-     * @param  string  $watcherId  The watcher ID returned by addFileWatcher()
-     * @return bool True if watcher was removed, false if not found
-     */
-    public function removeFileWatcher(string $watcherId): bool;
-
-    /**
      * Add a fiber to be managed by the event loop.
      *
      * @param  Fiber<mixed, mixed, mixed, mixed>  $fiber  The fiber instance to add to the loop
