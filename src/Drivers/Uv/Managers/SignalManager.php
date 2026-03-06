@@ -10,12 +10,12 @@ use Hibla\EventLoop\ValueObjects\Signal;
 final class SignalManager implements SignalManagerInterface
 {
     /**
-     * @var resource 
+     * @var \UVLoop
      */
-    private $uvLoop;
+    private \UVLoop $uvLoop;
 
     /**
-     * @var array<int, resource> Map of signal number to uv_signal resource
+     * @var array<int, \UVSignal> Map of signal number to uv_signal resource
      */
     private array $uvHandles = [];
 
@@ -34,11 +34,11 @@ final class SignalManager implements SignalManagerInterface
      */
     private \Closure $signalCallback;
 
-    public function __construct($uvLoop)
+    public function __construct(\UVLoop $uvLoop)
     {
         $this->uvLoop = $uvLoop;
 
-        $this->signalCallback = function ($handle, $signalNum) {
+        $this->signalCallback = function (\UVSignal $handle, int $signalNum): void {
             if (isset($this->signals[$signalNum]) && \count($this->signals[$signalNum]) > 0) {
                 foreach ($this->signals[$signalNum] as $signalObject) {
                     $signalObject->invoke($signalNum);
@@ -59,6 +59,7 @@ final class SignalManager implements SignalManagerInterface
         $this->signalIndex[$id] = $signal;
 
         if (!isset($this->uvHandles[$signal])) {
+            /** @var \UVSignal $handle */
             $handle = \uv_signal_init($this->uvLoop);
             $this->uvHandles[$signal] = $handle;
 

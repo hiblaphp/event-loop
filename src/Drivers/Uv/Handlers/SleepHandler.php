@@ -10,7 +10,7 @@ final class SleepHandler implements SleepHandlerInterface
 {
     /**
      * In the UV driver, sleeping is handled natively by uv_run().
-     * We return false here to ensure the PHP-land loop doesn't try to sleep manually.
+     * it return false here to ensure the PHP-land loop doesn't try to sleep manually.
      */
     public function shouldSleep(bool $hasImmediateWork): bool
     {

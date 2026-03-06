@@ -11,12 +11,12 @@ use InvalidArgumentException;
 final class StreamManager implements StreamManagerInterface
 {
     /**
-     * @var resource
+     * @var \UVLoop
      */
-    private $uvLoop;
+    private \UVLoop $uvLoop;
 
     /**
-     * @var array<int, resource> Map of streamId => uv_poll handle
+     * @var array<int, \UVPoll> Map of streamId => uv_poll handle
      */
     private array $uvHandles = [];
 
@@ -45,24 +45,25 @@ final class StreamManager implements StreamManagerInterface
      */
     private \Closure $pollCallback;
 
-    public function __construct($uvLoop)
+    public function __construct(\UVLoop $uvLoop)
     {
         $this->uvLoop = $uvLoop;
 
-        $this->pollCallback = function ($handle, $status, $events, $stream): void {
+        $this->pollCallback = function (\UVPoll $handle, int $status, int $events, mixed $stream): void {
+            /** @var resource $stream */
             $streamId = (int) $stream;
 
             if ($status !== 0) {
                 $events = \UV::READABLE | \UV::WRITABLE;
             }
 
-            if (($events & \UV::READABLE) && \count($this->readWatchers[$streamId] ?? []) > 0) {
+            if (($events & \UV::READABLE) !== 0 && \count($this->readWatchers[$streamId] ?? []) > 0) {
                 foreach ($this->readWatchers[$streamId] as $watcher) {
                     $watcher->execute();
                 }
             }
 
-            if (($events & \UV::WRITABLE) && \count($this->writeWatchers[$streamId] ?? []) > 0) {
+            if (($events & \UV::WRITABLE) !== 0 && \count($this->writeWatchers[$streamId] ?? []) > 0) {
                 foreach ($this->writeWatchers[$streamId] as $watcher) {
                     $watcher->execute();
                 }
@@ -145,7 +146,8 @@ final class StreamManager implements StreamManagerInterface
 
         unset($this->watcherIndex[$watcherId]);
 
-        if (\count($this->readWatchers[$streamId] ?? []) === 0
+        if (
+            \count($this->readWatchers[$streamId] ?? []) === 0
             && \count($this->writeWatchers[$streamId] ?? []) === 0
         ) {
             unset($this->streamResources[$streamId]);
@@ -185,11 +187,11 @@ final class StreamManager implements StreamManagerInterface
             \uv_close($handle);
         }
 
-        $this->uvHandles = [];
+        $this->uvHandles       = [];
         $this->streamResources = [];
-        $this->readWatchers = [];
-        $this->writeWatchers = [];
-        $this->watcherIndex = [];
+        $this->readWatchers    = [];
+        $this->writeWatchers   = [];
+        $this->watcherIndex    = [];
     }
 
     /**
@@ -210,7 +212,7 @@ final class StreamManager implements StreamManagerInterface
         }
 
         $this->watcherIndex[$watcherId] = [
-            'type'=> $type,
+            'type'     => $type,
             'streamId' => $streamId,
         ];
 
@@ -265,6 +267,7 @@ final class StreamManager implements StreamManagerInterface
                 return;
             }
 
+            /** @var \UVPoll $handle */
             $this->uvHandles[$streamId] = $handle;
         }
 

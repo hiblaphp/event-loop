@@ -12,14 +12,14 @@ use SplPriorityQueue;
 final class TimerManager implements UvTimerManagerInterface
 {
     /**
-     * @var resource
+     * @var \UVLoop
      */
-    private $uvLoop;
+    private \UVLoop $uvLoop;
 
     /**
-     * @var resource The ONLY libuv timer handle used to wake up uv_run
+     * @var \UVTimer The ONLY libuv timer handle used to wake up uv_run
      */
-    private $masterTimer;
+    private \UVTimer $masterTimer;
 
     /**
      * @var array<int, Timer|PeriodicTimer>
@@ -38,7 +38,7 @@ final class TimerManager implements UvTimerManagerInterface
      */
     private \Closure $masterCallback;
 
-    public function __construct($uvLoop)
+    public function __construct(\UVLoop $uvLoop)
     {
         $this->uvLoop = $uvLoop;
         $this->masterTimer = \uv_timer_init($this->uvLoop);
