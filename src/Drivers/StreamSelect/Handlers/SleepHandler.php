@@ -20,6 +20,7 @@ final class SleepHandler implements SleepHandlerInterface
     public function __construct(
         private TimerManagerInterface $timerManager,
         private FiberManagerInterface $fiberManager,
+        // @phpstan-ignore-next-line
         private HttpRequestManagerInterface $httpRequestManager,
         private StreamManagerInterface $streamManager,
     ) {
