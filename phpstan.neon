@@ -6,5 +6,5 @@ parameters:
     paths:
         - src
     treatPhpDocTypesAsCertain: false
-    stubFiles:
-        - stubs/uv.stub.php
+    scanFiles:
+        - stubs/uv.php
