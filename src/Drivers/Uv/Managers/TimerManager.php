@@ -46,12 +46,16 @@ final class TimerManager implements UvTimerManagerInterface
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
 
-        // The master callback is intentionally a no-op.
+        /// The master callback is intentionally a no-op.
         // Its only job is to make uv_run() wake up when a timer is due.
         // WorkHandler pulls the ready callbacks via collectReadyTimers()
         // and executes them one at a time with microtask draining between each,
         // matching Node.js timer phase semantics.
-        $this->masterCallback = static function (): void {
+        //
+        // NOTE: Must NOT be a static closure — the UV extension requires the
+        // callback to have a bound object context when invoked internally.
+        // Using static function here causes a segfault at runtime.
+        $this->masterCallback = function (): void {
             // No-op: intentional. See above.
         };
     }

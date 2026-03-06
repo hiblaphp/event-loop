@@ -26,20 +26,64 @@ use Hibla\EventLoop\Drivers\Uv\Managers\TimerManager as UvTimerManager;
 use Hibla\EventLoop\Drivers\Uv\Handlers\SleepHandler as UvSleepHandler;
 use Hibla\EventLoop\Drivers\Uv\Handlers\WorkHandler as UvWorkHandler;
 
+use RuntimeException;
+
 final class EventLoopComponentFactory
 {
+    public const string DRIVER_UV            = 'uv';
+    public const string DRIVER_STREAM_SELECT = 'stream_select';
+    public const string ENV_KEY              = 'HIBLA_LOOP_DRIVER';
+
     /**
      * Detects available extensions and creates the underlying loop resource.
      *
-     * @return \UVLoop|null Returns a uv_loop resource if ext-uv is available, null otherwise.
+     * Resolution order:
+     *   1. HIBLA_LOOP_DRIVER environment variable (explicit override)
+     *   2. Auto-detect — uv if ext-uv is loaded, stream_select otherwise
+     *
+     * @return \UVLoop|null Returns a UVLoop if the uv driver is selected, null for stream_select.
+     * @throws RuntimeException If HIBLA_LOOP_DRIVER is set to an unsupported or unavailable driver.
      */
     public static function createLoopResource(): ?\UVLoop
     {
-        if (\function_exists('uv_loop_new')) {
+        $driver = self::resolveDriver();
+
+        if ($driver === self::DRIVER_UV) {
+            if (! \function_exists('uv_loop_new')) {
+                throw new RuntimeException(
+                    'HIBLA_LOOP_DRIVER is set to "uv" but the uv extension is not loaded.'
+                );
+            }
+
             return \uv_loop_new();
         }
 
         return null;
+    }
+
+    public static function resolveDriver(): string
+    {
+        $env = $_SERVER[self::ENV_KEY] ?? $_ENV[self::ENV_KEY] ?? null;
+
+        if ($env !== null && $env !== '') {
+            $env = \strtolower(\trim($env));
+
+            if (! \in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {
+                throw new RuntimeException(
+                    sprintf(
+                        'Unsupported value "%s" for %s. Supported drivers: uv, stream_select.',
+                        $env,
+                        self::ENV_KEY,
+                    )
+                );
+            }
+
+            return $env;
+        }
+
+        return \function_exists('uv_loop_new')
+            ? self::DRIVER_UV
+            : self::DRIVER_STREAM_SELECT;
     }
 
     public static function createWorkHandler(
