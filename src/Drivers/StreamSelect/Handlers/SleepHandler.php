@@ -35,10 +35,11 @@ final class SleepHandler implements SleepHandlerInterface
             return false;
         }
 
-        $hasWaitingIO = $this->httpRequestManager->hasRequests()
-            || $this->streamManager->hasWatchers();
-
-        if ($hasWaitingIO) {
+        // HTTP requests alone do NOT prevent sleeping — WorkHandler services
+        // curl on a usleep interval (Unix) or relies on this handler's 1ms
+        // Windows cap (Windows), so the sleep path must remain available to
+        // avoid a busy-spin when only HTTP work is pending.
+        if ($this->streamManager->hasWatchers()) {
             return false;
         }
 
@@ -58,9 +59,9 @@ final class SleepHandler implements SleepHandlerInterface
             return $maxSleepNs;
         }
 
-        $delayNs = (int)($nextTimerDelay * 1_000_000_000);
+        $delayNs = (int) ($nextTimerDelay * 1_000_000_000);
 
-        $bufferDelayNs = (int)($delayNs * 0.9);
+        $bufferDelayNs = (int) ($delayNs * 0.9);
 
         return min(
             max($bufferDelayNs, 100_000),
