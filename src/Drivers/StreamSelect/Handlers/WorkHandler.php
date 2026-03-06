@@ -68,6 +68,9 @@ final class WorkHandler implements WorkHandlerInterface
     }
 
     /**
+     *
+     * {@inheritDoc}
+     *
      * Process one full cycle of work following Node.js event loop semantics:
      * 1. Signal Handling
      * 2. NextTick callbacks (highest priority)
@@ -83,7 +86,7 @@ final class WorkHandler implements WorkHandlerInterface
      *
      * NOTE: ticks + microtasks are drained after every phase transition
      */
-    public function processWork(): bool
+    public function processWork(bool $blocking = true): bool
     {
         $workDone = false;
 
@@ -103,7 +106,7 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->streamManager->hasWatchers();
 
         if ($hasIO) {
-            if ($this->processIOOperations()) {
+            if ($this->processIOOperations($blocking)) {
                 $workDone = true;
                 $this->processTicksAndMicrotasks();
             }
@@ -228,9 +231,10 @@ final class WorkHandler implements WorkHandlerInterface
      * immediates), stream_select is given a zero timeout so it polls only
      * and returns instantly — matching ReactPHP's StreamSelectLoop behavior.
      *
+     * @param bool $blocking Whether to allow stream_select to block and wait for I/O
      * @return bool True if any I/O work was performed
      */
-    private function processIOOperations(): bool
+    private function processIOOperations(bool $blocking): bool
     {
         $workDone = false;
 
@@ -239,7 +243,9 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->streamManager->hasWatchers()) {
-            if ($this->streamManager->processStreams($this->calculateStreamTimeout())) {
+            $timeout = $blocking ? $this->calculateStreamTimeout() : 0;
+
+            if ($this->streamManager->processStreams($timeout)) {
                 $workDone = true;
             }
         }

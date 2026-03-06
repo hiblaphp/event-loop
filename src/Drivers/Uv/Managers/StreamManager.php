@@ -128,9 +128,9 @@ final class StreamManager implements StreamManagerInterface
             return false;
         }
 
-        $meta     = $this->watcherIndex[$watcherId];
+        $meta = $this->watcherIndex[$watcherId];
         $streamId = $meta['streamId'];
-        $type     = $meta['type'];
+        $type = $meta['type'];
 
         if ($type === StreamWatcher::TYPE_READ) {
             unset($this->readWatchers[$streamId][$watcherId]);
@@ -187,11 +187,11 @@ final class StreamManager implements StreamManagerInterface
             \uv_close($handle);
         }
 
-        $this->uvHandles       = [];
+        $this->uvHandles = [];
         $this->streamResources = [];
-        $this->readWatchers    = [];
-        $this->writeWatchers   = [];
-        $this->watcherIndex    = [];
+        $this->readWatchers = [];
+        $this->writeWatchers = [];
+        $this->watcherIndex = [];
     }
 
     /**
@@ -199,8 +199,8 @@ final class StreamManager implements StreamManagerInterface
      */
     private function addStreamWatcher($stream, callable $callback, string $type): string
     {
-        $watcher   = new StreamWatcher($stream, $callback, $type);
-        $streamId  = (int) $stream;
+        $watcher = new StreamWatcher($stream, $callback, $type);
+        $streamId = (int) $stream;
         $watcherId = $watcher->getId();
 
         $this->streamResources[$streamId] = $stream;
@@ -212,7 +212,7 @@ final class StreamManager implements StreamManagerInterface
         }
 
         $this->watcherIndex[$watcherId] = [
-            'type'     => $type,
+            'type' => $type,
             'streamId' => $streamId,
         ];
 

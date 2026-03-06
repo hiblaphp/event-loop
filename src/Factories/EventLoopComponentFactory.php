@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Factories;
 
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler as StreamSelectSleepHandler;
+use Hibla\EventLoop\Drivers\StreamSelect\Handlers\WorkHandler as StreamSelectWorkHandler;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\SignalManager as StreamSelectSignalManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\StreamManager as StreamSelectStreamManager;
+use Hibla\EventLoop\Drivers\StreamSelect\Managers\TimerManager as StreamSelectTimerManager;
+use Hibla\EventLoop\Drivers\Uv\Handlers\SleepHandler as UvSleepHandler;
+use Hibla\EventLoop\Drivers\Uv\Handlers\WorkHandler as UvWorkHandler;
+use Hibla\EventLoop\Drivers\Uv\Managers\SignalManager as UvSignalManager;
+use Hibla\EventLoop\Drivers\Uv\Managers\StreamManager as UvStreamManager;
+
+use Hibla\EventLoop\Drivers\Uv\Managers\TimerManager as UvTimerManager;
 use Hibla\EventLoop\Handlers\TickHandler;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
 use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
+
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\UvTimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
 
-use Hibla\EventLoop\Drivers\StreamSelect\Managers\SignalManager as StreamSelectSignalManager;
-use Hibla\EventLoop\Drivers\StreamSelect\Managers\StreamManager as StreamSelectStreamManager;
-use Hibla\EventLoop\Drivers\StreamSelect\Managers\TimerManager as StreamSelectTimerManager;
-use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler as StreamSelectSleepHandler;
-use Hibla\EventLoop\Drivers\StreamSelect\Handlers\WorkHandler as StreamSelectWorkHandler;
-
-use Hibla\EventLoop\Drivers\Uv\Managers\SignalManager as UvSignalManager;
-use Hibla\EventLoop\Drivers\Uv\Managers\StreamManager as UvStreamManager;
-use Hibla\EventLoop\Drivers\Uv\Managers\TimerManager as UvTimerManager;
-use Hibla\EventLoop\Drivers\Uv\Handlers\SleepHandler as UvSleepHandler;
-use Hibla\EventLoop\Drivers\Uv\Handlers\WorkHandler as UvWorkHandler;
-
 use RuntimeException;
 
 final class EventLoopComponentFactory
 {
-    public const string DRIVER_UV            = 'uv';
+    public const string DRIVER_UV = 'uv';
     public const string DRIVER_STREAM_SELECT = 'stream_select';
-    public const string ENV_KEY              = 'HIBLA_LOOP_DRIVER';
+    public const string ENV_KEY = 'HIBLA_LOOP_DRIVER';
 
     /**
      * Detects available extensions and creates the underlying loop resource.
@@ -66,6 +66,7 @@ final class EventLoopComponentFactory
         $env = $_SERVER[self::ENV_KEY] ?? $_ENV[self::ENV_KEY] ?? null;
 
         if ($env !== null && $env !== '') {
+            assert(\is_string($env));
             $env = \strtolower(\trim($env));
 
             if (! \in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {

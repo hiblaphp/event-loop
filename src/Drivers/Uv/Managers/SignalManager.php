@@ -58,7 +58,7 @@ final class SignalManager implements SignalManagerInterface
         $this->signals[$signal][$id] = $signalObject;
         $this->signalIndex[$id] = $signal;
 
-        if (!isset($this->uvHandles[$signal])) {
+        if (! isset($this->uvHandles[$signal])) {
             /** @var \UVSignal $handle */
             $handle = \uv_signal_init($this->uvLoop);
             $this->uvHandles[$signal] = $handle;
@@ -74,7 +74,7 @@ final class SignalManager implements SignalManagerInterface
      */
     public function removeSignal(string $signalId): bool
     {
-        if (!isset($this->signalIndex[$signalId])) {
+        if (! isset($this->signalIndex[$signalId])) {
             return false;
         }
 

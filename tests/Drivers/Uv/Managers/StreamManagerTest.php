@@ -135,7 +135,7 @@ describe('StreamManager (UV)', function () {
             $manager->removeReadWatcher($watcherId);
         });
 
-        \uv_run($loop, \UV::RUN_ONCE);
+        \uv_run($loop, UV::RUN_ONCE);
 
         expect($called)->toBeTrue();
 
@@ -155,7 +155,7 @@ describe('StreamManager (UV)', function () {
             $manager->removeWriteWatcher($watcherId);
         });
 
-        \uv_run($loop, \UV::RUN_ONCE);
+        \uv_run($loop, UV::RUN_ONCE);
 
         expect($called)->toBeTrue();
 
@@ -209,7 +209,7 @@ describe('StreamManager (UV)', function () {
         $manager = new StreamManager($loop);
         [$client, $server] = createTcpSocketPair();
 
-        $readWatcherId  = $manager->addReadWatcher($server, fn () => null);
+        $readWatcherId = $manager->addReadWatcher($server, fn () => null);
         $writeWatcherId = $manager->addWriteWatcher($client, fn () => null);
 
         expect($manager->hasWatchers())->toBeTrue();

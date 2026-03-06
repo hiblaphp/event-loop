@@ -38,5 +38,8 @@ jobs:
       - name: Run Tests
         run: ./vendor/bin/pest
       
+      - name: Run PHPStan
+        run: ./vendor/bin/phpstan analyze 
+      
       - name: Run Laravel Pint
         run: ./vendor/bin/pint

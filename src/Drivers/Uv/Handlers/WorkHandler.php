@@ -42,7 +42,7 @@ final class WorkHandler implements WorkHandlerInterface
     }
 
     /**
-     * Process one full cycle of work following Node.js event loop semantics.
+     * {@inheritDoc}
      *
      * The key difference from the StreamSelect driver is that libuv drives
      * I/O and timer wake-ups internally via uv_run(). WorkHandler's job is
@@ -74,7 +74,7 @@ final class WorkHandler implements WorkHandlerInterface
      *
      * NOTE: ticks + microtasks are drained after every phase transition
      */
-    public function processWork(): bool
+    public function processWork(bool $blocking = true): bool
     {
         $workDone = false;
 
@@ -85,7 +85,9 @@ final class WorkHandler implements WorkHandlerInterface
         $hasImmediateWork = $this->tickHandler->hasImmediateCallbacks()
             || $this->fiberManager->hasReadyFibers();
 
-        $flags = $hasImmediateWork ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
+        $hasPolledIO = $this->httpRequestManager->hasRequests();
+
+        $flags = (! $blocking || $hasImmediateWork || $hasPolledIO) ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
 
         \uv_run($this->uvLoop, $flags);
 
@@ -136,7 +138,7 @@ final class WorkHandler implements WorkHandlerInterface
             }
         }
 
-        return true;
+        return $workDone;
     }
 
     /**

@@ -134,6 +134,7 @@ final class TimerManager implements UvTimerManagerInterface
             // Skip cancelled timers
             if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
 
@@ -213,10 +214,11 @@ final class TimerManager implements UvTimerManagerInterface
 
             if (! isset($this->timers[$id])) {
                 $this->timerQueue->extract();
+
                 continue;
             }
 
-            $delayNs  = $this->timers[$id]->executeAt - $currentTime;
+            $delayNs = $this->timers[$id]->executeAt - $currentTime;
             $delaySecs = $delayNs / 1_000_000_000;
 
             return $delaySecs > 0 ? $delaySecs : 0.0;
@@ -261,10 +263,10 @@ final class TimerManager implements UvTimerManagerInterface
             \uv_timer_stop($this->masterTimer);
         }
 
-        $this->timers    = [];
+        $this->timers = [];
         $this->timerQueue = new SplPriorityQueue();
         $this->timerQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
-        $this->nextId    = 0;
+        $this->nextId = 0;
     }
 
     private function scheduleMasterTimer(): void

@@ -45,7 +45,7 @@ describe('TimerManager (UV)', function () {
             $executed = true;
         });
 
-        \uv_run($loop, \UV::RUN_ONCE);
+        \uv_run($loop, UV::RUN_ONCE);
 
         $callbacks = $manager->collectReadyTimers();
 
@@ -69,7 +69,7 @@ describe('TimerManager (UV)', function () {
         }, maxExecutions: 3);
 
         for ($i = 0; $i < 5; $i++) {
-            \uv_run($loop, \UV::RUN_ONCE);
+            \uv_run($loop, UV::RUN_ONCE);
             $callbacks = $manager->collectReadyTimers();
             foreach ($callbacks as $callback) {
                 $callback();
@@ -131,7 +131,7 @@ describe('TimerManager (UV)', function () {
             $executed++;
         });
 
-        \uv_run($loop, \UV::RUN_ONCE);
+        \uv_run($loop, UV::RUN_ONCE);
 
         $callbacks = $manager->collectReadyTimers();
         foreach ($callbacks as $callback) {

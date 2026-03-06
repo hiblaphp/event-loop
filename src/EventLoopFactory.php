@@ -263,7 +263,7 @@ final class EventLoopFactory implements LoopInterface
      */
     public function runOnce(): void
     {
-        $hasImmediateWork = $this->tick();
+        $hasImmediateWork = $this->tick(true);
 
         if ($this->sleepHandler->shouldSleep($hasImmediateWork)) {
             $sleepTime = $this->sleepHandler->calculateOptimalSleep();
@@ -333,7 +333,7 @@ final class EventLoopFactory implements LoopInterface
             ! $this->stateHandler->shouldForceShutdown()
         ) {
 
-            $this->tick();
+            $this->tick(false);
             $gracefulCount++;
 
             usleep(1000);
@@ -397,11 +397,12 @@ final class EventLoopFactory implements LoopInterface
      * Executes all available work and updates activity tracking.
      * This is the core processing method called by the main run loop.
      *
+     * @param bool $blocking Whether the work handler is allowed to block for I/O
      * @return bool True if work was processed, false if no work was available
      */
-    private function tick(): bool
+    private function tick(bool $blocking = true): bool
     {
-        $workDone = $this->workHandler->processWork();
+        $workDone = $this->workHandler->processWork($blocking);
 
         if ($workDone) {
             $this->activityHandler->updateLastActivity();
