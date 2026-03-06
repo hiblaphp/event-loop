@@ -23,6 +23,7 @@ final class SignalManager implements SignalManagerInterface
      * @var array<int, array<string, Signal>>
      */
     private array $signals = [];
+
     /**
      * @var array<string, int> Map of signalId to signal number for fast removal
      */
@@ -37,9 +38,8 @@ final class SignalManager implements SignalManagerInterface
     {
         $this->uvLoop = $uvLoop;
 
-        // Shared callback that LibUV triggers when a signal is caught
         $this->signalCallback = function ($handle, $signalNum) {
-            if (!empty($this->signals[$signalNum])) {
+            if (isset($this->signals[$signalNum]) && \count($this->signals[$signalNum]) > 0) {
                 foreach ($this->signals[$signalNum] as $signalObject) {
                     $signalObject->invoke($signalNum);
                 }
@@ -52,14 +52,12 @@ final class SignalManager implements SignalManagerInterface
      */
     public function addSignal(int $signal, callable $callback): string
     {
-        // Generate a unique ID and value object for this specific listener
         $id = uniqid('signal_', true);
         $signalObject = new Signal($signal, $callback, $id);
 
         $this->signals[$signal][$id] = $signalObject;
         $this->signalIndex[$id] = $signal;
 
-        // If this is the first listener for this specific signal, create the UV handle
         if (!isset($this->uvHandles[$signal])) {
             $handle = \uv_signal_init($this->uvLoop);
             $this->uvHandles[$signal] = $handle;
@@ -81,12 +79,10 @@ final class SignalManager implements SignalManagerInterface
 
         $signalNum = $this->signalIndex[$signalId];
 
-        // Remove the specific listener
         unset($this->signals[$signalNum][$signalId]);
         unset($this->signalIndex[$signalId]);
 
-        // If no more listeners exist for this signal, stop and clean up the UV handle
-        if (empty($this->signals[$signalNum])) {
+        if (\count($this->signals[$signalNum] ?? []) === 0) {
             unset($this->signals[$signalNum]);
 
             if (isset($this->uvHandles[$signalNum])) {

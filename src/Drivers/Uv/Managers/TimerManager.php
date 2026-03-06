@@ -51,7 +51,7 @@ final class TimerManager implements UvTimerManagerInterface
         // WorkHandler pulls the ready callbacks via collectReadyTimers()
         // and executes them one at a time with microtask draining between each,
         // matching Node.js timer phase semantics.
-        $this->masterCallback = function (): void {
+        $this->masterCallback = static function (): void {
             // No-op: intentional. See above.
         };
     }
@@ -184,8 +184,7 @@ final class TimerManager implements UvTimerManagerInterface
     }
 
     /**
-     * Reschedule the master libuv timer without executing any callbacks.
-     * Called by WorkHandler after it has finished executing collected timers.
+     * @inheritDoc
      */
     public function rescheduleMaster(): void
     {

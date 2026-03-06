@@ -185,11 +185,11 @@ final class StreamManager implements StreamManagerInterface
             \uv_close($handle);
         }
 
-        $this->uvHandles       = [];
+        $this->uvHandles = [];
         $this->streamResources = [];
-        $this->readWatchers    = [];
-        $this->writeWatchers   = [];
-        $this->watcherIndex    = [];
+        $this->readWatchers = [];
+        $this->writeWatchers = [];
+        $this->watcherIndex = [];
     }
 
     /**
@@ -210,7 +210,7 @@ final class StreamManager implements StreamManagerInterface
         }
 
         $this->watcherIndex[$watcherId] = [
-            'type'     => $type,
+            'type'=> $type,
             'streamId' => $streamId,
         ];
 
