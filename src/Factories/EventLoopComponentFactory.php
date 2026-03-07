@@ -49,7 +49,7 @@ final class EventLoopComponentFactory
         $driver = self::resolveDriver();
 
         if ($driver === self::DRIVER_UV) {
-            if (! \function_exists('uv_loop_new')) {
+            if (!extension_loaded('uv')) {
                 throw new RuntimeException(
                     'HIBLA_LOOP_DRIVER is set to "uv" but the uv extension is not loaded.'
                 );
@@ -69,7 +69,7 @@ final class EventLoopComponentFactory
             assert(\is_string($env));
             $env = \strtolower(\trim($env));
 
-            if (! \in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {
+            if (!\in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {
                 throw new RuntimeException(
                     sprintf(
                         'Unsupported value "%s" for %s. Supported drivers: uv, stream_select.',
@@ -82,7 +82,7 @@ final class EventLoopComponentFactory
             return $env;
         }
 
-        return \function_exists('uv_loop_new')
+        return extension_loaded('uv')
             ? self::DRIVER_UV
             : self::DRIVER_STREAM_SELECT;
     }
