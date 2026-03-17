@@ -17,7 +17,7 @@ interface HttpRequestManagerInterface
      * @param  callable  $callback  The completion callback
      * @return string The request ID
      */
-    public function addHttpRequest(string $url, array $options, callable $callback): string;
+    public function addCurlRequest(string $url, array $options, callable $callback): string;
 
     /**
      * Cancels a pending or active HTTP request.
@@ -25,7 +25,7 @@ interface HttpRequestManagerInterface
      * @param  string  $requestId  The request ID to cancel
      * @return bool True if cancelled, false if not found
      */
-    public function cancelHttpRequest(string $requestId): bool;
+    public function cancelCurlRequest(string $requestId): bool;
 
     /**
      * Processes pending and active requests for one tick.

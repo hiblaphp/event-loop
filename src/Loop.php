@@ -88,7 +88,7 @@ final class Loop
      * Schedule a periodic timer that executes repeatedly at specified intervals.
      *
      * @param  float  $interval  Interval in seconds between executions
-     * @param  callable  $callback  Function to execute on each interval
+     * @param  callable(string $timerId)  $callback  Function to execute on each interval
      * @param  int|null  $maxExecutions  Maximum number of executions (null for infinite)
      * @return string Unique identifier for the periodic timer
      */
@@ -116,20 +116,20 @@ final class Loop
      * @param  callable  $callback  Function to execute when request completes.
      * @return string A unique ID for the request.
      */
-    public static function addHttpRequest(string $url, array $options, callable $callback): string
+    public static function addCurlRequest(string $url, array $options, callable $callback): string
     {
-        return self::getInstance()->addHttpRequest($url, $options, $callback);
+        return self::getInstance()->addCurlRequest($url, $options, $callback);
     }
 
     /**
      * Cancel a previously scheduled HTTP request.
      *
-     * @param  string  $requestId  The request ID returned by addHttpRequest()
+     * @param  string  $requestId  The request ID returned by addCurlRequest()
      * @return bool True if request was cancelled, false if not found
      */
-    public static function cancelHttpRequest(string $requestId): bool
+    public static function cancelCurlRequest(string $requestId): bool
     {
-        return self::getInstance()->cancelHttpRequest($requestId);
+        return self::getInstance()->cancelCurlRequest($requestId);
     }
 
     /**

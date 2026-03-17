@@ -43,15 +43,15 @@ interface LoopInterface
      * @param  callable  $callback  Function to execute when request completes
      * @return string A unique ID for the request
      */
-    public function addHttpRequest(string $url, array $options, callable $callback): string;
+    public function addCurlRequest(string $url, array $options, callable $callback): string;
 
     /**
      * Cancel a previously scheduled HTTP request.
      *
-     * @param  string  $requestId  The request ID returned by addHttpRequest()
+     * @param  string  $requestId  The request ID returned by addCurlRequest()
      * @return bool True if request was cancelled, false if not found
      */
-    public function cancelHttpRequest(string $requestId): bool;
+    public function cancelCurlRequest(string $requestId): bool;
 
     /**
      * Remove a stream watcher by its watcher ID.

@@ -153,17 +153,17 @@ final class EventLoopFactory implements LoopInterface
     /**
      * @inheritDoc
      */
-    public function addHttpRequest(string $url, array $options, callable $callback): string
+    public function addCurlRequest(string $url, array $options, callable $callback): string
     {
-        return $this->httpRequestManager->addHttpRequest($url, $options, $callback);
+        return $this->httpRequestManager->addCurlRequest($url, $options, $callback);
     }
 
     /**
      * @inheritDoc
      */
-    public function cancelHttpRequest(string $requestId): bool
+    public function cancelCurlRequest(string $requestId): bool
     {
-        return $this->httpRequestManager->cancelHttpRequest($requestId);
+        return $this->httpRequestManager->cancelCurlRequest($requestId);
     }
 
     /**

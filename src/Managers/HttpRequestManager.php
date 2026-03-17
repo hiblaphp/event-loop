@@ -31,13 +31,20 @@ final class HttpRequestManager implements HttpRequestManagerInterface
 
     public function __construct()
     {
+        if (!extension_loaded('curl')) {
+            throw new RuntimeException(
+                'ext-curl is required to use HTTP request features. ' .
+                    'Install the curl extension or avoid calling addCurlRequest().'
+            );
+        }
+
         $this->multiHandle = curl_multi_init();
     }
 
     /**
      * @inheritDoc
      */
-    public function addHttpRequest(string $url, array $options, callable $callback): string
+    public function addCurlRequest(string $url, array $options, callable $callback): string
     {
         $request = new HttpRequest($url, $options, $callback);
         $requestId = spl_object_hash($request);
@@ -51,7 +58,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
     /**
      * @inheritDoc
      */
-    public function cancelHttpRequest(string $requestId): bool
+    public function cancelCurlRequest(string $requestId): bool
     {
         if (! isset($this->requestsById[$requestId])) {
             return false;

@@ -14,7 +14,7 @@ describe('HttpRequestManager', function () {
         $manager = new HttpRequestManager();
         $called = false;
 
-        $requestId = $manager->addHttpRequest(
+        $requestId = $manager->addCurlRequest(
             'https://httpbin.org/get',
             [],
             function () use (&$called) {
@@ -30,7 +30,7 @@ describe('HttpRequestManager', function () {
         $manager = new HttpRequestManager();
         $called = false;
 
-        $requestId = $manager->addHttpRequest(
+        $requestId = $manager->addCurlRequest(
             'https://httpbin.org/delay/10',
             [],
             function ($error) use (&$called) {
@@ -39,17 +39,17 @@ describe('HttpRequestManager', function () {
             }
         );
 
-        $cancelled = $manager->cancelHttpRequest($requestId);
+        $cancelled = $manager->cancelCurlRequest($requestId);
         expect($cancelled)->toBeTrue();
         expect($called)->toBeTrue();
 
-        expect($manager->cancelHttpRequest('invalid'))->toBeFalse();
+        expect($manager->cancelCurlRequest('invalid'))->toBeFalse();
     });
 
     it('provides debug information', function () {
         $manager = new HttpRequestManager();
 
-        $manager->addHttpRequest('https://httpbin.org/get', [], fn () => null);
+        $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
 
         $debug = $manager->getDebugInfo();
 
@@ -69,11 +69,11 @@ describe('HttpRequestManager', function () {
         $manager = new HttpRequestManager();
         $callCount = 0;
 
-        $manager->addHttpRequest('https://httpbin.org/get', [], function () use (&$callCount) {
+        $manager->addCurlRequest('https://httpbin.org/get', [], function () use (&$callCount) {
             $callCount++;
         });
 
-        $manager->addHttpRequest('https://httpbin.org/post', [], function () use (&$callCount) {
+        $manager->addCurlRequest('https://httpbin.org/post', [], function () use (&$callCount) {
             $callCount++;
         });
 
@@ -90,8 +90,8 @@ describe('HttpRequestManager', function () {
     it('can clear pending requests only', function () {
         $manager = new HttpRequestManager();
 
-        $manager->addHttpRequest('https://httpbin.org/get', [], fn () => null);
-        $manager->addHttpRequest('https://httpbin.org/post', [], fn () => null);
+        $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
+        $manager->addCurlRequest('https://httpbin.org/post', [], fn () => null);
 
         $cleared = $manager->clearPendingRequests();
 
@@ -106,7 +106,7 @@ describe('HttpRequestManager', function () {
 
         $manager = new HttpRequestManager();
 
-        $manager->addHttpRequest('https://httpbin.org/get', [], fn () => null);
+        $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
 
         $processed = $manager->processRequests();
         expect($processed)->toBeTrue();

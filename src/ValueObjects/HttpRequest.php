@@ -36,7 +36,11 @@ final class HttpRequest
     private function createCurlHandle(array $options): \CurlHandle
     {
         $handle = curl_init();
+
         curl_setopt_array($handle, $options);
+        curl_setopt($handle, CURLOPT_URL, $this->url);
+        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($handle, CURLOPT_HEADER, true);
 
         return $handle;
     }

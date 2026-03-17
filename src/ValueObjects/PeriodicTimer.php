@@ -41,7 +41,7 @@ final class PeriodicTimer
 
         $nextExecuteAt = $this->executeAt + $this->intervalNs;
 
-        ($this->callback)();
+        ($this->callback)((string) $this->id);
 
         if ($this->shouldContinue()) {
             $now = hrtime(true);

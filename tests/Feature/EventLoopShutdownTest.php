@@ -58,7 +58,7 @@ describe('EventLoop Shutdown', function () {
         $loop = EventLoopFactory::getInstance();
         $completed = false;
 
-        $loop->addHttpRequest('https://httpbin.org/delay/10', [], function () use (&$completed) {
+        $loop->addCurlRequest('https://httpbin.org/delay/10', [], function () use (&$completed) {
             $completed = true;
         });
 
