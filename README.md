@@ -629,8 +629,8 @@ streams are not supported when using this driver.
 | **I/O mechanism** | `select()` syscall | `epoll` / `kqueue` / `IOCP` via libuv |
 | **Readiness model** | O(N) — kernel scans all watched fds | O(1) — kernel delivers only active fds |
 | **Max concurrent streams** | ~1024 (OS `FD_SETSIZE` limit) | Tens of thousands |
-| **File handle support** | ✅ All PHP stream resources | ⚠ Sockets and pipes only |
-| **In-memory streams** | ✅ `php://memory`, `php://temp` | ❌ Not supported |
+| **File handle support** | All PHP stream resources | ! Sockets and pipes only |
+| **In-memory streams** | `php://memory`, `php://temp` | Not supported |
 | **Timers** | PHP-land `SplPriorityQueue` + `hrtime` | Single master `UVTimer` per loop |
 | **Signals** | `pcntl_signal_dispatch()` each tick | `UVSignal` — native inside `uv_run` |
 | **Sleep** | `time_nanosleep()` with retry logic | No-op — libuv sleeps natively |
