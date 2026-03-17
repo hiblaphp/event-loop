@@ -22,7 +22,7 @@ interface TimerManagerInterface
      * Adds a new periodic timer.
      *
      * @param  float  $interval  Interval in seconds
-     * @param  callable(string $timerId)  $callback  The timer callback
+     * @param  callable(string $timerId): void  $callback  The timer callback
      * @param  int|null  $maxExecutions  Maximum executions (null for infinite)
      * @return string The timer ID
      */

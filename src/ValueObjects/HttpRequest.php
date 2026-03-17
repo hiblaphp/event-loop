@@ -13,6 +13,9 @@ final class HttpRequest
      */
     private $callback;
 
+    /**
+     *  @var non-empty-string 
+     */ 
     private string $url;
 
     private ?string $id = null;
@@ -24,6 +27,10 @@ final class HttpRequest
      */
     public function __construct(string $url, array $options, callable $callback)
     {
+        if ($url === '') {
+            throw new \InvalidArgumentException('HTTP Request URL cannot be empty.');
+        }
+
         $this->url = $url;
         $this->callback = $callback;
         $this->handle = $this->createCurlHandle($options);

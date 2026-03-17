@@ -19,8 +19,7 @@
         }
     ],
     "require": {
-        "php": "^8.3",
-        "ext-curl": "*"
+        "php": "^8.3"
     },
     "require-dev": {
         "pestphp/pest": "^4.0",
@@ -39,5 +38,9 @@
         "format": "./vendor/bin/pint",
         "format-test": "./vendor/bin/pint --test",
         "analyze": "./vendor/bin/phpstan analyse"
+    },
+    "suggest": {
+        "ext-curl": "Required for using Curl HTTP requests",
+        "ext-uv" : "Used for extreme performance"
     }
 }

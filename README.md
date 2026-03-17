@@ -1,0 +1,743 @@
+# Hibla Event Loop
+
+**The dual-driver, Node.js-style event loop engine powering the Hibla PHP ecosystem.**
+
+A high-performance, cross-platform async event loop for PHP. Automatically uses
+[ext-uv](https://github.com/amphp/ext-uv) (libuv) when available, falling back
+to a pure PHP `stream_select` implementation with zero extra dependencies.
+Designed as the foundation layer for higher-level Hibla packages or be use as the foundation for other async ecosystem.
+
+[![Latest Release](https://img.shields.io/github/release/hiblaphp/event-loop.svg?style=flat-square)](https://github.com/hiblaphp/event-loop/releases)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
+
+---
+
+## Key Features
+
+- **Dual Driver:** Automatically selects libuv (`ext-uv`) or pure PHP `stream_select` at runtime.
+- **Node.js Phase Semantics:** Faithful implementation of nextTick → microtask → timers → I/O → fibers → check → deferred ordering.
+- **Auto-Run:** No need to call `Loop::run()` manually. The loop starts automatically at the end of your script.
+- **Cross-Platform:** Full support for Linux, macOS, and Windows. Platform-specific sleep and I/O strategies are handled internally.
+- **Fiber-Aware:** First-class `Fiber` scheduling with explicit resume control — the foundation for Promise and Future implementations.
+- **Async HTTP:** Built-in `curl_multi` integration for non-blocking HTTP requests.
+- **Signal Handling:** POSIX signal support on Unix/macOS via `pcntl` or libuv natively.
+
+---
+
+## Installation
+```bash
+composer require hiblaphp/event-loop
+```
+
+**Requirements:**
+- PHP 8.3+
+- `ext-curl` (required only if you use `Loop::addCurlRequest()` — a `RuntimeException` is thrown at runtime if curl is not loaded)
+- `ext-pcntl` + `ext-posix` (Unix/macOS only, required for signal handling)
+- `ext-uv` (optional — enables the UV driver for better performance)
+
+---
+
+## 1. Auto-Run: Zero Boilerplate
+
+The event loop registers itself via `register_shutdown_function`. Any work
+you schedule — timers, HTTP requests, fibers — will automatically be processed
+when your script reaches the end, without you ever calling `Loop::run()`.
+```php
+use Hibla\EventLoop\Loop;
+
+Loop::addTimer(1.0, function () {
+    echo "Fired after 1 second\n";
+});
+
+// Script ends → loop runs automatically. No Loop::run() needed.
+```
+
+If you need to block and drive the loop explicitly mid-script, you can:
+```php
+Loop::run(); // Blocks until all work is exhausted or stop() is called
+```
+
+> **Important:** Auto-run will **not** trigger if the script terminates
+> abnormally. This includes unhandled exceptions, fatal errors (`E_ERROR`,
+> `E_CORE_ERROR`, `E_COMPILE_ERROR`, etc.), or an explicit `exit()`/`die()`
+> call. In these cases any pending work — timers, in-flight HTTP requests,
+> queued fibers — will be silently abandoned.
+>
+> If your application relies on deferred work completing reliably, always
+> call `Loop::run()` explicitly and handle exceptions before it is reached.
+```php
+// Safe pattern for scripts where completion matters
+try {
+    Loop::addTimer(1.0, fn() => doImportantWork());
+    Loop::run();
+} catch (\Throwable $e) {
+    // Handle before the loop exits — auto-run will NOT save you here
+    logger()->error($e->getMessage());
+}
+```
+
+---
+
+## 2. Timers
+
+### One-time timer
+
+The callback receives no arguments. By the time it fires, the timer has already
+been removed from the queue — there is nothing to cancel.
+```php
+Loop::addTimer(2.5, function () {
+    echo "Runs once after 2.5 seconds\n";
+});
+```
+
+### Repeating timer
+
+The callback receives the timer's `string $timerId` as its first argument,
+giving you a direct handle to cancel or inspect it from within the callback
+itself without needing an outer variable.
+```php
+Loop::addPeriodicTimer(1.0, function (string $timerId) {
+    echo "Tick — timer ID: $timerId\n";
+});
+```
+
+### Repeating timer with a max execution count
+```php
+Loop::addPeriodicTimer(0.5, function () {
+    echo "Runs 5 times, then stops\n";
+}, maxExecutions: 5);
+```
+
+### Cancelling a one-time timer
+```php
+$id = Loop::addTimer(10.0, fn() => null);
+Loop::cancelTimer($id);
+```
+
+### Cancelling a repeating timer
+
+Periodic timers run indefinitely until cancelled. Use the returned ID to stop
+them from outside the callback:
+```php
+$id = Loop::addPeriodicTimer(1.0, function () {
+    echo "Tick\n";
+});
+
+// Stop after 5 seconds
+Loop::addTimer(5.0, function () use ($id) {
+    Loop::cancelTimer($id);
+    echo "Periodic timer cancelled\n";
+});
+```
+
+Or cancel from within its own callback using the injected `$timerId`:
+```php
+Loop::addPeriodicTimer(1.0, function (string $timerId) {
+    static $count = 0;
+    $count++;
+
+    echo "Tick $count\n";
+
+    if ($count >= 5) {
+        Loop::cancelTimer($timerId);
+    }
+});
+```
+
+> **Note:** Self-cancellation via `$timerId` is useful when the stopping
+> condition depends on runtime state rather than a fixed count. For a fixed
+> count, `maxExecutions` is simpler.
+
+---
+
+## 3. Async HTTP Curl Requests
+
+> **Note:** `Loop::addCurlRequest()` is a low-level primitive that requires
+> manual curl option management. For most use cases you should use
+> [`hiblaphp/http-client`](https://github.com/hiblaphp/http-client) which
+> provides a clean abstraction API built on top of this primitive.
+
+`Loop::addCurlRequest()` accepts a URL, an array of `CURLOPT_*` options, and a
+completion callback with the signature:
+`(?string $error, ?string $body, ?int $httpCode, array $headers, ?string $httpVersion)`.
+```php
+Loop::addCurlRequest(
+    url: 'https://api.example.com/data',
+    options: [
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+    ],
+    callback: function (?string $error, ?string $body, ?int $status, array $headers, ?string $version) {
+        if ($error !== null) {
+            echo "Request failed: $error\n";
+            return;
+        }
+
+        echo "HTTP $status — Body: $body\n";
+    }
+);
+```
+
+### Forced curl options
+
+The following options are always enforced internally and cannot be overridden
+by the `$options` array, regardless of what you pass:
+
+| Option | Value | Reason |
+|---|---|---|
+| `CURLOPT_URL` | The `$url` argument | Always derived from the first parameter |
+| `CURLOPT_RETURNTRANSFER` | `true` | Required for the response body to be captured |
+| `CURLOPT_HEADER` | `true` | Required for the response header parser to work |
+
+### Callback parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `$error` | `?string` | curl error message, or `null` on success |
+| `$body` | `?string` | Response body, or `null` on error |
+| `$httpCode` | `?int` | HTTP status code, or `null` on error |
+| `$headers` | `array` | Parsed associative array of response headers. Multi-value headers are represented as arrays |
+| `$httpVersion` | `?string` | HTTP protocol version: `'1.0'`, `'1.1'`, `'2.0'`, `'3.0'`, or `null` if undetermined |
+
+### Running requests concurrently
+
+All requests registered before the loop ticks are admitted into `curl_multi`
+together and processed concurrently. There is no special API needed —
+just register multiple requests and they will run in parallel:
+```php
+Loop::addCurlRequest('https://api.example.com/users', [], fn(...$args) => handleUsers(...$args));
+Loop::addCurlRequest('https://api.example.com/posts', [], fn(...$args) => handlePosts(...$args));
+Loop::addCurlRequest('https://api.example.com/stats', [], fn(...$args) => handleStats(...$args));
+
+// All three fire concurrently.
+```
+
+### Cancelling a request
+
+Cancelling a request in flight calls the callback immediately with
+`'Request cancelled'` as the `$error` argument:
+```php
+$id = Loop::addCurlRequest('https://...', [], fn() => null);
+Loop::cancelCurlRequest($id);
+```
+
+---
+
+## 4. Stream Watchers
+
+> **Note:** The stream watcher API is a low-level primitive. For most use
+> cases — TCP servers, clients, pipes — you should use
+> [`hiblaphp/stream`](https://github.com/hiblaphp/stream), which provides a
+> high-level abstraction built on top of these primitives.
+
+Stream watchers notify you when a stream resource is ready for reading or writing.
+The stream **must** be set to non-blocking mode before registering a watcher.
+The stream resource **must also remain open and valid** for the entire lifetime
+of the watcher — closing a stream while a watcher is still registered produces
+undefined behavior. Always remove the watcher before closing the stream.
+```php
+$stream = stream_socket_client('tcp://example.com:80', $errno, $errstr, 0, STREAM_CLIENT_ASYNC_CONNECT);
+stream_set_blocking($stream, false);
+
+$id = Loop::addReadWatcher($stream, function ($stream) {
+    $data = fread($stream, 4096);
+    echo "Received: $data\n";
+});
+
+// Always remove the watcher before closing
+Loop::removeReadWatcher($id);
+fclose($stream);
+```
+```php
+$id = Loop::addWriteWatcher($stream, function ($stream) use (&$id) {
+    fwrite($stream, "GET / HTTP/1.0\r\n\r\n");
+    Loop::removeWriteWatcher($id);
+});
+```
+
+If you have the watcher ID but not its type, `removeStreamWatcher()` handles both:
+```php
+Loop::removeStreamWatcher($id);
+```
+
+### ext-uv limitation: file handles and in-memory streams
+
+When running on the **UV driver**, only true socket or pipe resources are
+supported as stream watchers. Passing a regular file handle (`fopen()`) or
+an in-memory stream (`fopen('php://memory', ...)`, `fopen('php://temp', ...)`)
+to `addReadWatcher()` or `addWriteWatcher()` will produce a PHP warning and
+the watcher will silently fail to register.
+```php
+// These will cause a warning and fail silently on the UV driver:
+$file   = fopen('/path/to/file.txt', 'r');
+$memory = fopen('php://memory', 'r+');
+
+Loop::addReadWatcher($file, $callback);   // ⚠ UV driver: unsupported handle type
+Loop::addReadWatcher($memory, $callback); // ⚠ UV driver: unsupported handle type
+```
+
+This is a **libuv limitation** — `uv_poll` only operates on handles backed by
+a real OS socket or pipe file descriptor. Regular files and virtual streams do
+not have a pollable fd.
+
+**Workarounds:**
+
+- Force the `stream_select` driver for scripts that need to watch file handles:
+```bash
+HIBLA_LOOP_DRIVER=stream_select php your-script.php
+```
+- Read files synchronously or offload them to a worker process via
+  [`hiblaphp/parallel`](https://github.com/hiblaphp/parallel) instead of
+  watching them with the event loop.
+- Use socket pairs or named pipes if you specifically need async inter-process
+  communication on the UV driver.
+
+The `stream_select` driver has no such restriction and supports all valid PHP
+stream resources.
+
+---
+
+## 5. Task Queues & the Work Phase
+
+The event loop processes work in a fixed phase order every iteration, matching
+Node.js semantics. Understanding this order is important for controlling
+execution priority.
+
+### Phase Order (per iteration)
+
+| # | Phase | Method | Description |
+|---|-------|--------|-------------|
+| 1 | **Signal** | `Loop::addSignal()` | Dispatches any pending OS signals |
+| 2 | **nextTick** | `Loop::nextTick()` | Highest priority. Drained completely before anything else |
+| 3 | **Microtask** | `Loop::microTask()` | Runs after nextTick, before timers. Used internally for Promise resolution |
+| 4 | **Timers** | `Loop::addTimer()` | Ready timers execute one at a time. nextTick + microtasks drain after each |
+| 5 | **I/O** | streams, HTTP | `stream_select` / `uv_run` — wakes when I/O is ready or next timer is due |
+| 6 | **Fibers** | `Loop::addFiber()` | All ready fibers are processed. nextTick + microtasks drain after each |
+| 7 | **Check** | `Loop::setImmediate()` | Runs after I/O. New `setImmediate` calls during this phase land in the *next* iteration |
+| 8 | **Deferred** | `Loop::defer()` | Runs only when phases 2–7 are all completely empty |
+
+nextTick and microtask queues are drained **after every single phase transition**,
+ensuring no high-priority callbacks are starved by lower-priority work.
+
+### Task Queue Methods
+```php
+// Runs before everything else in the next iteration (highest priority)
+Loop::nextTick(function () {
+    echo "1 — nextTick\n";
+});
+
+// Runs after nextTick, before timers/I/O — intended for Promise resolution
+Loop::microTask(function () {
+    echo "2 — microtask\n";
+});
+
+// Runs in the check phase, after I/O
+Loop::setImmediate(function () {
+    echo "3 — setImmediate\n";
+});
+
+// Runs only when no ticks, microtasks, timers, I/O, fibers, or immediates are pending
+Loop::defer(function () {
+    echo "4 — deferred\n";
+});
+```
+
+### nextTick starvation
+
+Because the nextTick queue is drained completely before the loop advances to
+any other phase, a nextTick callback that keeps enqueuing more nextTick
+callbacks will starve timers, I/O, fibers, and all other work indefinitely.
+The loop will never advance past phase 2 until the nextTick queue is empty.
+```php
+// ⚠ This will stall the event loop forever — timers and I/O will never run
+Loop::nextTick(function () {
+    Loop::nextTick(function () {
+        Loop::nextTick(fn() => /* ... */);
+    });
+});
+```
+
+If you need to schedule recurring high-priority work without starving the loop,
+use `Loop::setImmediate()` instead — it runs in the check phase after I/O and
+new calls made during the check phase are deferred to the next iteration,
+preventing starvation.
+
+---
+
+## 6. Fibers
+
+> **Note:** The fiber API is a low-level primitive primarily intended for
+> building Promise, Future, and coroutine abstractions. If you are consuming
+> Hibla's higher-level packages, you will likely interact with Promises rather
+> than fibers directly.
+
+### Cooperative scheduling model
+
+Only **one fiber runs at a time**. The event loop does not run fibers in
+parallel — it runs one fiber, waits for it to either suspend or terminate, then
+moves on to the next. Fibers are cooperatively scheduled by the `FiberManager`,
+meaning the loop only advances to the next fiber once the current one has
+explicitly yielded control back via `Fiber::suspend()`. A fiber that never
+suspends will run to completion before any other fiber in the queue gets a turn.
+```php
+Loop::addFiber(new Fiber(function () {
+    echo "Fiber 1 — start\n";
+    Fiber::suspend(); // Yields control back to the loop
+    echo "Fiber 1 — resumed\n";
+}));
+
+Loop::addFiber(new Fiber(function () {
+    echo "Fiber 2 — start\n";
+    Fiber::suspend();
+    echo "Fiber 2 — resumed\n";
+}));
+
+// Output order:
+// Fiber 1 — start       (fiber 1 runs until it suspends)
+// Fiber 2 — start       (fiber 2 runs until it suspends)
+// Fiber 1 — resumed     (fiber 1 is scheduled back and resumes)
+// Fiber 2 — resumed     (fiber 2 is scheduled back and resumes)
+```
+
+This cooperative model is what makes fibers safe to use with shared state —
+there are no race conditions because only one fiber is ever executing at a
+given moment. The tradeoff is that a fiber which blocks or never suspends
+monopolizes the loop until it finishes.
+
+### How Fiber scheduling works
+
+When you call `Loop::addFiber()`, the fiber is **not started immediately**.
+It is placed in a ready queue and will be picked up during the **Fiber phase**
+of the next event loop iteration. This means:
+
+1. Fiber execution is always deferred to the next tick — you cannot rely on it running synchronously.
+2. Fibers are started in the order they were added.
+3. After each fiber is processed, the nextTick and microtask queues are fully drained before moving to the next fiber.
+```php
+$fiber = new Fiber(function () {
+    echo "A — Fiber started (this does NOT print immediately)\n";
+    Fiber::suspend();
+    echo "C — Fiber resumed\n";
+});
+
+Loop::addFiber($fiber);
+echo "B — This prints before the fiber starts\n";
+
+// Output order:
+// B — This prints before the fiber starts
+// A — Fiber started
+// C — Fiber resumed (once scheduleFiber is called)
+```
+
+### Suspending and resuming
+
+Once a fiber calls `Fiber::suspend()`, it is moved to a suspended state
+and will **never be automatically resumed**. You must explicitly call
+`Loop::scheduleFiber()` to tell the event loop to resume it. This gives you
+full control over when a suspended fiber is woken up — for example, after an
+HTTP response arrives, a timer fires, or a stream becomes readable.
+```php
+$fiber = new Fiber(function () {
+    echo "Fiber: waiting for data...\n";
+    Fiber::suspend();
+    echo "Fiber: resumed\n";
+});
+
+Loop::addFiber($fiber);
+
+Loop::addTimer(1.0, function () use ($fiber) {
+    Loop::scheduleFiber($fiber); // Queues the fiber to be resumed in the next Fiber phase
+});
+```
+
+`Loop::scheduleFiber()` queues the fiber back into the ready queue so it will
+be picked up during the next Fiber phase. You can call it from anywhere —
+a timer callback, a curl completion callback, a stream watcher, or another fiber.
+
+### Blocking calls stall the loop
+
+Because fibers run on the same thread and only one fiber runs at a time,
+a blocking call inside a fiber will stall the entire event loop for its
+duration — no other timers, I/O watchers, or fibers will run until the
+blocking call returns. Always ensure work inside a fiber is either
+non-blocking or yields control via `Fiber::suspend()` while waiting.
+
+### Building a Promise with Fibers
+
+This is the primary intended use case. A Promise implementation can suspend
+a fiber when awaiting a result and resume it via `scheduleFiber` when the
+value resolves:
+```php
+function await(callable $asyncOperation): mixed
+{
+    $fiber = Fiber::getCurrent() ?? throw new \LogicException('Must be called inside a Fiber');
+
+    $asyncOperation(function () use ($fiber) {
+        Loop::scheduleFiber($fiber);
+    });
+
+    return Fiber::suspend();
+}
+```
+
+### Key rules
+
+- `Loop::addFiber()` — registers an **unstarted** fiber. It will be started during the next Fiber phase. If called after `Loop::forceStop()` the fiber is silently dropped.
+- `Loop::scheduleFiber()` — queues a **suspended** fiber to be resumed by the event loop. Has no effect on a fiber that has already terminated.
+- Calling `scheduleFiber()` on a fiber that was never registered via `addFiber()` is safe as long as the fiber is in a suspended state — the loop will resume it in the next Fiber phase.
+- Calling `scheduleFiber()` on a running or terminated fiber is silently ignored.
+- Fibers that terminate normally are automatically cleaned up by the loop.
+---
+
+## 7. Signal Handling
+
+Signal handling is available on **Unix and macOS only** and requires `ext-pcntl`.
+Calling `Loop::addSignal()` on Windows throws a `BadMethodCallException` because
+`pcntl_signal` is not available on that platform.
+```php
+Loop::addSignal(SIGINT, function (int $signal) {
+    echo "Caught SIGINT — shutting down gracefully...\n";
+    Loop::stop();
+});
+
+Loop::addSignal(SIGTERM, function (int $signal) {
+    Loop::stop();
+});
+```
+
+Multiple independent listeners can be registered for the same signal number.
+Each is assigned its own ID and can be removed individually without affecting
+the others:
+```php
+$id1 = Loop::addSignal(SIGHUP, function (int $signal) {
+    echo "Listener 1: reloading config...\n";
+});
+
+$id2 = Loop::addSignal(SIGHUP, function (int $signal) {
+    echo "Listener 2: flushing cache...\n";
+});
+
+Loop::removeSignal($id1); // Only removes listener 1, listener 2 still active
+```
+
+---
+
+## 8. Controlling the Loop
+```php
+// Block until all work is exhausted or stop() is called
+Loop::run();
+
+// Process exactly one full iteration (all phases once), then invoke the
+// sleep handler — this may block briefly if there is no immediate work
+// but future timers are pending
+Loop::runOnce();
+
+// Graceful stop — finishes the current iteration then exits.
+// Allows up to 10 additional iterations with a 2 second timeout for
+// in-flight work to complete before forcing a shutdown.
+Loop::stop();
+
+// Immediate stop — clears all queues and exits now, no cleanup
+Loop::forceStop();
+
+// Introspection
+Loop::isRunning(); // true while the loop is actively iterating
+Loop::isIdle();    // true when no pending work or loop has been inactive
+```
+
+---
+
+## 9. Selecting a Driver
+
+The UV driver is selected automatically when `ext-uv` is loaded. You can
+override this with an environment variable:
+```bash
+# Force the pure PHP driver even if ext-uv is available
+HIBLA_LOOP_DRIVER=stream_select php your-script.php
+
+# Force the UV driver (throws RuntimeException if ext-uv is not loaded)
+HIBLA_LOOP_DRIVER=uv php your-script.php
+```
+
+This environment variable is also useful in CI pipelines to run your test suite
+against a specific driver without needing `ext-uv` installed:
+```yaml
+# Run tests against the pure PHP driver
+- name: Run Tests
+  run: HIBLA_LOOP_DRIVER=stream_select ./vendor/bin/pest
+```
+
+### How each driver works
+
+**`stream_select` (pure PHP)**
+
+The `stream_select` driver is built entirely on PHP's built-in `stream_select()`
+function, which is a thin wrapper around the operating system's `select()`
+syscall. Each iteration of the loop calls `stream_select()` with a calculated
+timeout derived from the next pending timer, so it blocks efficiently until
+either I/O arrives or the next timer is due — it does not busy-spin.
+
+The key limitation of this driver comes from `select()` itself, not from PHP.
+Most operating systems impose a hard cap of **1024 file descriptors** on a
+single `select()` call (`FD_SETSIZE = 1024`). This means the `stream_select`
+driver can watch at most **1024 simultaneous connections, streams, or file
+handles** at one time. Attempting to exceed this limit produces undefined
+behavior at the OS level.
+
+Beyond the 1024 cap, `select()` also has an **O(N) readiness model**. Every
+time `stream_select()` is called, the kernel must linearly scan through every
+watched file descriptor to check which ones are ready. This means the more
+connections you are watching, the more work the kernel does on every single
+loop iteration — even if only one descriptor actually has activity. At low
+connection counts this cost is negligible, but it grows linearly with load.
+
+For the majority of applications — background jobs, scheduled tasks, moderate
+HTTP workloads, CLI tooling — neither the 1024 limit nor the O(N) cost is ever
+reached in practice, and `stream_select` is a perfectly capable driver with no
+additional dependencies.
+
+**`uv` (libuv via ext-uv)**
+
+The UV driver delegates all I/O, timers, and signals to
+[libuv](https://libuv.org) — the same event loop library that powers Node.js.
+libuv uses `epoll` on Linux, `kqueue` on macOS, and `IOCP` on Windows under
+the hood. These are modern kernel interfaces that scale to tens of thousands of
+concurrent connections without the file descriptor cap that `select()` imposes.
+
+libuv's underlying interfaces use an **O(1) readiness model**. Instead of
+scanning all watched descriptors on every call, the kernel maintains an
+internal interest list and delivers only the descriptors that have actual
+activity. Whether you are watching 10 connections or 10,000, the cost of a
+`uv_run` iteration does not grow with the number of idle watchers. This is the
+fundamental scalability advantage of the UV driver over `stream_select` at high
+connection counts.
+
+Rather than polling for readiness in PHP-land, the UV driver registers a
+`UVPoll` handle per stream and lets libuv notify it when activity occurs.
+Timers are driven by a single master `UVTimer` handle, and signals are handled
+natively inside `uv_run()` with no `pcntl_signal_dispatch()` call needed.
+
+The tradeoff is that `ext-uv` must be compiled and installed separately, and —
+as noted in the Stream Watchers section — libuv's `uv_poll` only supports true
+socket and pipe file descriptors. Regular file handles and in-memory PHP
+streams are not supported when using this driver.
+
+### Driver comparison
+
+| | `stream_select` | `uv` |
+|---|---|---|
+| **Dependency** | None (pure PHP) | `ext-uv` required |
+| **I/O mechanism** | `select()` syscall | `epoll` / `kqueue` / `IOCP` via libuv |
+| **Readiness model** | O(N) — kernel scans all watched fds | O(1) — kernel delivers only active fds |
+| **Max concurrent streams** | ~1024 (OS `FD_SETSIZE` limit) | Tens of thousands |
+| **File handle support** | ✅ All PHP stream resources | ⚠ Sockets and pipes only |
+| **In-memory streams** | ✅ `php://memory`, `php://temp` | ❌ Not supported |
+| **Timers** | PHP-land `SplPriorityQueue` + `hrtime` | Single master `UVTimer` per loop |
+| **Signals** | `pcntl_signal_dispatch()` each tick | `UVSignal` — native inside `uv_run` |
+| **Sleep** | `time_nanosleep()` with retry logic | No-op — libuv sleeps natively |
+| **Recommended for** | General use, low-to-moderate load | High-concurrency production workloads |
+
+### Which should I use?
+
+Use the **`stream_select` driver** if:
+- You cannot or do not want to install `ext-uv`
+- Your workload stays well under ~1024 concurrent connections
+- You need to watch regular file handles or in-memory streams
+- You are running background jobs, CLI tools, or moderate HTTP workloads
+
+Use the **`uv` driver** if:
+- You are building a high-concurrency server that handles thousands of simultaneous connections
+- You want the most CPU-efficient event loop with the lowest latency
+- You are on a platform where `ext-uv` is available and the socket-only stream restriction is acceptable
+
+---
+
+## 10. Custom Loop Instance
+
+For testing or custom implementations, you can swap out the instance behind
+the `Loop` facade:
+```php
+use Hibla\Loop;
+use Hibla\EventLoop\Interfaces\LoopInterface;
+
+Loop::setInstance($myCustomLoop); // Must implement LoopInterface
+
+Loop::setInstance(null); // Reset to the default singleton
+```
+
+For test isolation, use `Loop::reset()` between tests to fully tear down
+the singleton and all registered shutdown hooks:
+```php
+protected function tearDown(): void
+{
+    Loop::reset();
+}
+```
+
+> **Note:** `Loop::reset()` tears down the PHP-land singleton but does not
+> cancel in-flight curl requests or close UV handles that may still be active.
+> Tests that perform real I/O should explicitly call `Loop::forceStop()` before
+> `Loop::reset()` to ensure resources are cleaned up before the next test runs.
+```php
+protected function tearDown(): void
+{
+    Loop::forceStop();
+    Loop::reset();
+}
+```
+
+---
+
+## Architecture
+
+The loop is built around a clean driver abstraction. The `Loop` static facade
+delegates to an `EventLoopFactory` singleton, which uses
+`EventLoopComponentFactory` to instantiate the correct driver components at startup.
+
+| Component | StreamSelect | UV |
+|---|---|---|
+| `WorkHandler` | Orchestrates `stream_select` + curl polling | Orchestrates `uv_run` + curl timer |
+| `TimerManager` | `SplPriorityQueue` min-heap, PHP-land | Single master `UVTimer` per loop |
+| `StreamManager` | `stream_select()` with timeout | `UVPoll` handle per stream |
+| `SignalManager` | `pcntl_signal` + dispatch each tick | `UVSignal` handle per signal |
+| `SleepHandler` | `time_nanosleep()` with retry | No-op (libuv sleeps natively) |
+
+---
+## Development
+
+### Running Tests
+
+Clone the repository and install dependencies:
+```bash
+git clone https://github.com/hiblaphp/event-loop.git
+cd event-loop
+composer install
+```
+
+Run the test suite:
+```bash
+./vendor/bin/pest
+```
+
+Run against a specific driver:
+```bash
+HIBLA_LOOP_DRIVER=stream_select ./vendor/bin/pest
+HIBLA_LOOP_DRIVER=uv ./vendor/bin/pest
+```
+
+Run static analysis:
+```bash
+./vendor/bin/phpstan analyse
+```
+
+---
+
+## Credits
+
+- **API Design:** Inspired by the [ReactPHP EventLoop](https://github.com/reactphp/event-loop) `Loop` API. If you are familiar with ReactPHP's loop interface, Hibla's API will feel immediately familiar — with the addition of native Fiber scheduling, built-in `curl_multi` integration, and a strict Node.js-style phase-based execution model.
+- **Philosophy:** Inspired by Node.js event loop semantics and the libuv architecture.
+
+---
+
+## License
+
+MIT License. See [LICENSE](./LICENSE) for more information.

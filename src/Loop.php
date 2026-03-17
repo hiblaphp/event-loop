@@ -88,7 +88,7 @@ final class Loop
      * Schedule a periodic timer that executes repeatedly at specified intervals.
      *
      * @param  float  $interval  Interval in seconds between executions
-     * @param  callable(string $timerId)  $callback  Function to execute on each interval
+     * @param  callable(string $timerId): void  $callback  The timer callback
      * @param  int|null  $maxExecutions  Maximum number of executions (null for infinite)
      * @return string Unique identifier for the periodic timer
      */
