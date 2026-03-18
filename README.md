@@ -387,6 +387,94 @@ preventing starvation.
 > Hibla's higher-level packages, you will likely interact with Promises rather
 > than fibers directly.
 
+### What is a Fiber?
+
+PHP has traditionally been synchronous — code runs top to bottom, and every
+line waits for the previous one to finish before moving on. If a line blocks
+(waiting for a database query, an HTTP response, or a file read), the entire
+script waits with it. There is no way to pause mid-function and let something
+else run in the meantime.
+
+**Fibers**, introduced in PHP 8.1, change this. A Fiber is a pausable function
+— a block of code that can suspend itself mid-execution, hand control back to
+whatever started it, and later be resumed exactly where it left off. Unlike a
+regular function call, which runs to completion and returns once, a Fiber can
+yield control multiple times before it finishes.
+```php
+$fiber = new Fiber(function () {
+    echo "Step 1\n";
+    Fiber::suspend(); // pause here, hand control back
+    echo "Step 2\n"; // resumes from exactly this point later
+});
+
+$fiber->start();  // runs until the first suspend
+echo "Between\n"; // runs while the fiber is paused
+$fiber->resume(); // resumes the fiber from where it left off
+
+// Output:
+// Step 1
+// Between
+// Step 2
+```
+
+### Fibers are stackful — unlike generators
+
+PHP generators can also pause and resume, but they are **stackless** — a
+generator can only suspend from the top level of its own body. It cannot
+suspend from inside a function it called. This severely limits their
+usefulness as an async primitive because any function that wants to pause
+must itself be a generator, and every caller of that function must also be
+a generator, all the way up the call stack. The suspension point must be
+explicitly propagated through every layer.
+
+Fibers have no such restriction. A Fiber is **stackful** — it owns its own
+full call stack, and `Fiber::suspend()` can be called from anywhere within
+that stack, no matter how deeply nested. An ordinary function called from
+within a fiber, which itself calls another function, which calls another,
+can suspend the entire fiber from that innermost frame. The whole call stack
+is frozen in place and restored exactly when the fiber is resumed. None of
+the intermediate callers need to know or care that a suspension happened.
+```php
+// Generators — suspension cannot cross function boundaries
+// every layer must be a generator and explicitly yield upward
+function innerWork(): \Generator {
+    yield; // can only suspend here because it is itself a generator
+}
+
+function outerWork(): \Generator {
+    yield from innerWork(); // must explicitly propagate the yield
+}
+
+// Fibers — suspension works anywhere in the call stack, no propagation needed
+function innerWork(): void {
+    Fiber::suspend(); // suspends the entire fiber from deep inside the stack
+}
+
+function middleLayer(): void {
+    innerWork(); // has no idea a suspension might happen — and does not need to
+}
+
+function outerWork(): void {
+    middleLayer(); // same — completely unaware of the suspension below
+}
+
+$fiber = new Fiber(function () {
+    outerWork(); // fiber suspends inside innerWork(), deep in the call stack
+    echo "Resumed — exactly where we left off\n";
+});
+
+$fiber->start();  // runs until Fiber::suspend() inside innerWork()
+$fiber->resume(); // restores the entire call stack and continues
+```
+
+This is what makes Fibers the right foundation for async abstractions like
+`await()`. A single `Fiber::suspend()` call inside the deepest layer of your
+application can pause the entire operation and hand control back to the event
+loop — without any of the intermediate code needing to be rewritten as a
+generator or decorated with `async`/`await` keywords.
+
+---
+
 ### Cooperative scheduling model
 
 Only **one fiber runs at a time**. The event loop does not run fibers in
@@ -482,19 +570,79 @@ non-blocking or yields control via `Fiber::suspend()` while waiting.
 
 This is the primary intended use case. A Promise implementation can suspend
 a fiber when awaiting a result and resume it via `scheduleFiber` when the
-value resolves:
+value arrives — and because fibers are stackful, the suspension can happen
+deep inside your application code without any of the intermediate layers
+needing to be rewritten.
+
+The basic primitive looks like this:
 ```php
-function await(callable $asyncOperation): mixed
+function await(PromiseInterface $promise): mixed
 {
-    $fiber = Fiber::getCurrent() ?? throw new \LogicException('Must be called inside a Fiber');
+    $fiber  = Fiber::getCurrent();
+    $result = null;
+    $error  = null;
 
-    $asyncOperation(function () use ($fiber) {
-        Loop::scheduleFiber($fiber);
-    });
+    $promise
+        ->then(static function ($value) use (&$result, $fiber) {
+            $result = $value;
+            Loop::scheduleFiber($fiber); // Queues the fiber to be resumed in the next Fiber phase after the promise resolves
+        })
+        ->catch(static function ($reason) use (&$error, $fiber) {
+            $error = $reason;
+            Loop::scheduleFiber($fiber); // Queues the fiber to be resumed in the next Fiber phase after the promise rejects
+        })
+    ;
 
-    return Fiber::suspend();
+    Fiber::suspend(); // suspends the entire fiber, however deep the call stack is
+
+    if ($error !== null) {
+        throw $error instanceof \Throwable
+            ? $error
+            : new \Exception('Promise rejected with: ' . var_export($error, true));
+    }
+
+    return $result;
 }
 ```
+
+And wrapping a callable in a fiber so it can use `await()` looks like this:
+```php
+function async(callable $function): PromiseInterface
+{
+    $promise = new Promise();
+
+    $fiber = new Fiber(function () use ($function, $promise): void {
+        try {
+            $result = $function();
+            $promise->resolve($result);
+        } catch (\Throwable $e) {
+            $promise->reject($e);
+        }
+    });
+
+    Loop::addFiber($fiber);
+
+    return $promise;
+}
+```
+
+With these two primitives in place, async code reads like synchronous code —
+`await()` suspends the fiber at any depth until the promise settles, the event
+loop runs other work in the meantime, and execution resumes exactly where it
+left off:
+```php
+$promise = async(function () {
+    $user = await(fetchUser(1));
+    $orders = await(fetchOrders($user->id));
+    return processOrders($orders);
+});
+
+$promise->then(fn($result) => print("Done: $result\n"));
+```
+
+No callbacks, no chaining — the fiber handles the suspension and resumption
+transparently, while the event loop continues processing other timers, I/O,
+and fibers while each `await()` is suspended.
 
 ### Key rules
 
@@ -503,7 +651,6 @@ function await(callable $asyncOperation): mixed
 - Calling `scheduleFiber()` on a fiber that was never registered via `addFiber()` is safe as long as the fiber is in a suspended state — the loop will resume it in the next Fiber phase.
 - Calling `scheduleFiber()` on a running or terminated fiber is silently ignored.
 - Fibers that terminate normally are automatically cleaned up by the loop.
----
 
 ## Signal Handling
 
