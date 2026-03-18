@@ -471,7 +471,7 @@ This is what makes Fibers the right foundation for async abstractions like
 `await()`. A single `Fiber::suspend()` call inside the deepest layer of your
 application can pause the entire operation and hand control back to the event
 loop — without any of the intermediate code needing to be rewritten as a
-generator or decorated with `async`/`await` keywords.
+generator or decorated with `async`/`await` functions.
 
 ---
 

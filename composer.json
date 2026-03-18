@@ -41,6 +41,8 @@
     },
     "suggest": {
         "ext-curl": "Required for using Curl HTTP requests",
-        "ext-uv" : "Used for extreme performance"
+        "ext-uv" : "Used for extreme performance",
+        "ext-pcntl": "Used for signal handling",
+        "ext-posix": "Used for signal handling"
     }
 }
