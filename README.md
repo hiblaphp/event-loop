@@ -23,6 +23,23 @@ Designed as the foundation layer for higher-level Hibla packages or be use as th
 - **Signal Handling:** POSIX signal support on Unix/macOS via `pcntl` or libuv natively.
 
 ---
+## Contents
+
+- [Installation](#installation)
+- [Auto-Run: Zero Boilerplate](#auto-run-zero-boilerplate)
+- [Timers](#timers)
+- [Async HTTP Curl Requests](#async-http-curl-requests)
+- [Stream Watchers](#stream-watchers)
+- [Task Queues & the Work Phase](#task-queues--the-work-phase)
+- [Fibers](#fibers)
+- [Signal Handling](#signal-handling)
+- [Controlling the Loop](#controlling-the-loop)
+- [Selecting a Driver](#selecting-a-driver)
+- [Custom Loop Instance](#custom-loop-instance)
+- [Architecture](#architecture)
+- [Development](#development)
+
+---
 
 ## Installation
 ```bash
@@ -37,7 +54,7 @@ composer require hiblaphp/event-loop
 
 ---
 
-## 1. Auto-Run: Zero Boilerplate
+## Auto-Run: Zero Boilerplate
 
 The event loop registers itself via `register_shutdown_function`. Any work
 you schedule — timers, HTTP requests, fibers — will automatically be processed
@@ -78,7 +95,7 @@ try {
 
 ---
 
-## 2. Timers
+## Timers
 
 ### One-time timer
 
@@ -150,7 +167,7 @@ Loop::addPeriodicTimer(1.0, function (string $timerId) {
 
 ---
 
-## 3. Async HTTP Curl Requests
+## Async HTTP Curl Requests
 
 > **Note:** `Loop::addCurlRequest()` is a low-level primitive that requires
 > manual curl option management. For most use cases you should use
@@ -222,7 +239,7 @@ Loop::cancelCurlRequest($id);
 
 ---
 
-## 4. Stream Watchers
+## Stream Watchers
 
 > **Note:** The stream watcher API is a low-level primitive. For most use
 > cases — TCP servers, clients, pipes — you should use
@@ -296,7 +313,7 @@ stream resources.
 
 ---
 
-## 5. Task Queues & the Work Phase
+## Task Queues & the Work Phase
 
 The event loop processes work in a fixed phase order every iteration, matching
 Node.js semantics. Understanding this order is important for controlling
@@ -363,7 +380,7 @@ preventing starvation.
 
 ---
 
-## 6. Fibers
+## Fibers
 
 > **Note:** The fiber API is a low-level primitive primarily intended for
 > building Promise, Future, and coroutine abstractions. If you are consuming
@@ -488,7 +505,7 @@ function await(callable $asyncOperation): mixed
 - Fibers that terminate normally are automatically cleaned up by the loop.
 ---
 
-## 7. Signal Handling
+## Signal Handling
 
 Signal handling is available on **Unix and macOS only** and requires `ext-pcntl`.
 Calling `Loop::addSignal()` on Windows throws a `BadMethodCallException` because
@@ -521,7 +538,7 @@ Loop::removeSignal($id1); // Only removes listener 1, listener 2 still active
 
 ---
 
-## 8. Controlling the Loop
+## Controlling the Loop
 ```php
 // Block until all work is exhausted or stop() is called
 Loop::run();
@@ -546,7 +563,7 @@ Loop::isIdle();    // true when no pending work or loop has been inactive
 
 ---
 
-## 9. Selecting a Driver
+## Selecting a Driver
 
 The UV driver is selected automatically when `ext-uv` is loaded. You can
 override this with an environment variable:
@@ -651,7 +668,7 @@ Use the **`uv` driver** if:
 
 ---
 
-## 10. Custom Loop Instance
+## Custom Loop Instance
 
 For testing or custom implementations, you can swap out the instance behind
 the `Loop` facade:
