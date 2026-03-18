@@ -26,6 +26,7 @@ Designed as the foundation layer for higher-level Hibla packages or be use as th
 ## Contents
 
 - [Installation](#installation)
+- [Introduction](#introduction)
 - [Auto-Run: Zero Boilerplate](#auto-run-zero-boilerplate)
 - [Timers](#timers)
 - [Async HTTP Curl Requests](#async-http-curl-requests)
@@ -51,6 +52,17 @@ composer require hiblaphp/event-loop
 - `ext-curl` (required only if you use `Loop::addCurlRequest()` — a `RuntimeException` is thrown at runtime if curl is not loaded)
 - `ext-pcntl` + `ext-posix` (Unix/macOS only, required for signal handling)
 - `ext-uv` (optional — enables the UV driver for better performance)
+
+---
+
+## Introduction
+
+PHP has traditionally been synchronous — one line runs, finishes, and only then does the next begin. Every blocking call, every database query, every HTTP request holds the entire script hostage for its duration. This works fine for short-lived request-response cycles, but falls apart the moment you need to handle multiple things at once: waiting on ten HTTP responses, driving hundreds of WebSocket connections, or running background jobs without spinning up a new process for each one.
+The solution is to invert the model. Instead of code waiting on I/O, you register what should happen when I/O arrives and hand control back immediately. A scheduler — the event loop — watches all the pending work at once, wakes up exactly when something is ready, and dispatches the right callback. Between events, the thread is free. No busy-spinning, no blocking, no wasted cycles.
+
+PHP 8.1 Fibers make this model dramatically more powerful. A Fiber is a pausable unit of execution that owns its own full call stack — it can suspend from anywhere inside it, no matter how deeply nested, and be resumed exactly where it left off. This means async code no longer has to be written as chains of callbacks. A function can suspend deep inside your application, the entire call stack freezes, the event loop picks up the next ready Fiber, and execution resumes later as if nothing happened — code that reads top to bottom like ordinary synchronous PHP, but runs cooperatively under the hood. Fiber scheduling is a first-class concept in Hibla's event loop: Fibers have their own dedicated phase in the loop, a ready queue that drains completely each iteration, and explicit resume control so suspended Fibers are only woken up when their work is actually ready to continue.
+
+The loop itself follows Node.js phase semantics: each iteration runs through signals, nextTick, microtasks, timers, I/O, fibers, check, and deferred — in that order — with the nextTick and microtask queues fully drained after every phase transition. This ordering is what keeps Promise resolution, timer callbacks, and Fiber resumption predictable no matter how work arrives. Its I/O backend is selected at startup: when ext-uv is available it delegates to libuv, using epoll, kqueue, or IOCP depending on the platform; without it, a pure PHP stream_select implementation takes over with no extra dependencies. Either way, the API is identical — the rest of the Hibla ecosystem builds on it without knowing or caring which driver is running underneath.
 
 ---
 
