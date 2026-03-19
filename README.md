@@ -36,7 +36,11 @@ foundation for other async ecosystems.
 
 ### Reference
 - [Architecture](#architecture)
+
+### Meta 
 - [Development](#development)
+- [Credits](#credits)
+- [License](#license)
 
 ---
 
