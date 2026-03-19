@@ -146,28 +146,269 @@ nextTick and microtask queues are drained **after every single phase
 transition**, ensuring no high-priority callbacks are starved by
 lower-priority work.
 
-### Task queue methods
+---
+
+### `nextTick` — before everything else
+
+`nextTick` callbacks have the highest priority in the loop. They run before
+timers, before I/O, before fibers — before anything else in the next
+iteration. The entire nextTick queue drains completely before the loop
+advances to any other phase.
+
+The practical use case is guaranteeing that a callback fires at the earliest
+possible point in the next iteration, regardless of what other work is queued.
+The most common real-world use is deferring work that depends on the current
+synchronous call completing first.
 ```php
-// Runs before everything else in the next iteration (highest priority)
-Loop::nextTick(function () {
-    echo "1 — nextTick\n";
-});
+class EventEmitter
+{
+    private array $listeners = [];
+    private array $pendingEvents = [];
 
-// Runs after nextTick, before timers/I/O — intended for Promise resolution
-Loop::microTask(function () {
-    echo "2 — microtask\n";
-});
+    public function on(string $event, callable $listener): void
+    {
+        $this->listeners[$event][] = $listener;
+    }
 
-// Runs in the check phase, after I/O
-Loop::setImmediate(function () {
-    echo "3 — setImmediate\n";
-});
+    public function emit(string $event, mixed $data): void
+    {
+        // Defer emission to nextTick so the caller's synchronous code
+        // finishes before any listener fires. Listeners attached after
+        // emit() but before the next tick still receive the event.
+        Loop::nextTick(function () use ($event, $data) {
+            foreach ($this->listeners[$event] ?? [] as $listener) {
+                $listener($data);
+            }
+        });
+    }
+}
 
-// Runs only when no ticks, microtasks, timers, I/O, fibers, or immediates are pending
-Loop::defer(function () {
-    echo "4 — deferred\n";
+$emitter = new EventEmitter();
+
+$emitter->emit('data', 'hello'); // schedules emission — does NOT fire yet
+
+// This listener is attached AFTER emit() — it still receives the event
+// because emission is deferred to nextTick
+$emitter->on('data', fn($d) => print("received: $d\n"));
+
+// Output: received: hello
+```
+
+Another common use is breaking a large synchronous operation into chunks so
+the loop stays responsive. Instead of processing everything in one blocking
+call, you schedule the next chunk via `nextTick`, giving the loop a chance to
+process I/O and timers between chunks:
+```php
+function processChunks(array $items): void
+{
+    if ($items === []) {
+        return;
+    }
+
+    $chunk = array_splice($items, 0, 100);
+
+    foreach ($chunk as $item) {
+        process($item);
+    }
+
+    if ($items !== []) {
+        // Schedule the next chunk — loop can handle I/O between chunks
+        Loop::nextTick(fn() => processChunks($items));
+    }
+}
+```
+
+> **Warning:** A `nextTick` callback that schedules another `nextTick`
+> indefinitely will starve the entire loop — timers, I/O, and fibers will
+> never run. See the starvation section below.
+
+---
+
+### `microTask` — Promise resolution
+
+`microTask` callbacks run after all `nextTick` callbacks in a given drain
+cycle, but before timers and I/O. They exist specifically for Promise
+resolution — when a Promise settles, its `.then()` callbacks are queued as
+microtasks so they fire before any new I/O or timers get a turn.
+
+You rarely need to call `Loop::microTask()` directly in application code.
+It is used internally by `hiblaphp/promise` to schedule resolution callbacks.
+If you are building your own Promise or Future implementation on top of the
+event loop, queue resolution callbacks as microtasks:
+```php
+class Promise
+{
+    private array $thenCallbacks = [];
+    private mixed $resolvedValue = null;
+    private bool $resolved = false;
+
+    public function then(callable $callback): static
+    {
+        if ($this->resolved) {
+            // Already resolved — queue the callback as a microtask so it
+            // fires before timers and I/O, matching Promise/A+ semantics
+            Loop::microTask(fn() => $callback($this->resolvedValue));
+        } else {
+            $this->thenCallbacks[] = $callback;
+        }
+
+        return $this;
+    }
+
+    public function resolve(mixed $value): void
+    {
+        $this->resolved = true;
+        $this->resolvedValue = $value;
+
+        foreach ($this->thenCallbacks as $callback) {
+            // Queue each resolution callback as a microtask — not nextTick,
+            // not a timer. Microtasks fire after nextTick but before I/O,
+            // which is the correct priority for promise resolution.
+            Loop::microTask(fn() => $callback($value));
+        }
+    }
+}
+```
+
+The distinction between `nextTick` and `microTask` matters when both are
+queued in the same iteration:
+```php
+Loop::microTask(fn() => print("2 — microtask\n"));
+Loop::nextTick(fn()  => print("1 — nextTick\n"));
+Loop::microTask(fn() => print("3 — microtask\n"));
+
+// Output:
+// 1 — nextTick    ← nextTick always drains before microtasks
+// 2 — microtask
+// 3 — microtask
+```
+
+---
+
+### `setImmediate` — after I/O, before the next iteration
+
+`setImmediate` callbacks run in the **check phase** — after I/O has been
+processed for the current iteration, but before the loop sleeps and waits for
+the next event. This makes it the right tool when you want to do work that
+responds to I/O results without delaying the next I/O poll.
+
+The check phase uses a **queue swap** — any `setImmediate` call made *during*
+the check phase lands in a fresh queue for the *next* iteration, not the
+current one. This prevents check-phase callbacks from starving timers and I/O
+by continuously scheduling new work into the same phase.
+```php
+// setImmediate fires after I/O in the current iteration
+Loop::addReadWatcher($socket, function ($socket) {
+    $data = fread($socket, 4096);
+
+    // Process the data after all I/O for this iteration is done
+    Loop::setImmediate(function () use ($data) {
+        parseAndDispatch($data);
+    });
 });
 ```
+
+A practical use case is batching work that arrives via multiple I/O events in
+the same iteration. Instead of processing each event immediately, you
+accumulate results and process them all together in `setImmediate`:
+```php
+$batch = [];
+
+Loop::addReadWatcher($socket, function ($socket) use (&$batch) {
+    $batch[] = fread($socket, 4096);
+
+    // Schedule batch processing once — setImmediate is idempotent-safe
+    // because new calls during check phase land in the next iteration
+    Loop::setImmediate(function () use (&$batch) {
+        processBatch($batch);
+        $batch = [];
+    });
+});
+```
+
+The contrast with `nextTick` is important:
+```
+nextTick     — fires before I/O in the next iteration
+setImmediate — fires after I/O in the current iteration
+```
+
+If you need work to happen as soon as possible, use `nextTick`. If you need
+work to happen after the current round of I/O is done, use `setImmediate`.
+
+---
+
+### `defer` — when the loop is truly idle
+
+`defer` callbacks run only when all other work is exhausted — the nextTick
+queue is empty, the microtask queue is empty, no timers are ready, no I/O
+is pending, no fibers are ready, and the check queue is empty. If any of
+those phases have work, deferred callbacks wait.
+
+Signal handlers are intentionally excluded from this check. A registered
+signal listener is edge-triggered — it means "call me if this signal arrives",
+not "there is pending work to do". A `SIGTERM` handler registered for graceful
+shutdown may never fire on a normal exit. Treating it as pending work would
+prevent deferred callbacks from ever running in long-lived processes that hold
+signal listeners for their entire lifetime.
+```php
+Loop::addSignal(SIGTERM, fn() => Loop::stop()); // registered for lifetime of process
+
+// This WILL run even though the SIGTERM listener is still registered —
+// signals are not considered pending work for the purpose of defer
+Loop::defer(function () {
+    logger()->debug('Loop idle — all pending work complete');
+});
+```
+
+This makes `defer` the right tool for work that should happen at the lowest
+possible priority — cleanup, diagnostics, cache eviction, or anything that
+should not compete with real work:
+```php
+// Flush metrics only when the loop has nothing else to do
+Loop::defer(function () {
+    metrics()->flush();
+});
+```
+
+A common pattern is using `defer` for resource cleanup after a request
+completes, ensuring cleanup never delays response handling:
+```php
+function handleRequest(Connection $conn): void
+{
+    $response = buildResponse();
+    $conn->write($response);
+
+    // Clean up only after everything else is done —
+    // never delays the next request from being handled
+    Loop::defer(fn() => $conn->cleanup());
+}
+```
+
+The key distinction from `setImmediate`:
+```
+setImmediate — fires after I/O even if more timers and fibers are pending
+defer        — fires only when there is genuinely nothing else left to do
+              (signal handlers do not count as pending work)
+```
+
+---
+
+### Choosing the right queue
+```
+Is the work urgent — must fire before any I/O or timers?
+  └─► nextTick
+
+Is this a Promise resolution callback?
+  └─► microTask (or let hiblaphp/promise handle it automatically)
+
+Should the work happen after the current round of I/O?
+  └─► setImmediate
+
+Is this cleanup or diagnostics that should never compete with real work?
+  └─► defer
+```
+
+---
 
 ### nextTick starvation
 
