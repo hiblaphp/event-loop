@@ -9,16 +9,16 @@ use Hibla\EventLoop\Factories\EventLoopComponentFactory;
 use Hibla\EventLoop\Handlers\ActivityHandler;
 use Hibla\EventLoop\Handlers\StateHandler;
 use Hibla\EventLoop\Handlers\TickHandler;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\LoopInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 use Hibla\EventLoop\Interfaces\WorkHandlerInterface;
+use Hibla\EventLoop\Managers\CurlRequestManager;
 use Hibla\EventLoop\Managers\FiberManager;
-use Hibla\EventLoop\Managers\HttpRequestManager;
 
 final class EventLoopFactory implements LoopInterface
 {
@@ -26,7 +26,7 @@ final class EventLoopFactory implements LoopInterface
 
     private TimerManagerInterface $timerManager;
 
-    private HttpRequestManagerInterface $httpRequestManager;
+    private CurlRequestManagerInterface $curlRequestManager;
 
     private StreamManagerInterface $streamManager;
 
@@ -57,7 +57,7 @@ final class EventLoopFactory implements LoopInterface
     {
         $this->loopResource = EventLoopComponentFactory::createLoopResource();
 
-        $this->httpRequestManager = new HttpRequestManager();
+        $this->curlRequestManager = new CurlRequestManager();
         $this->fiberManager = new FiberManager();
         $this->tickHandler = new TickHandler();
         $this->activityHandler = new ActivityHandler();
@@ -70,7 +70,7 @@ final class EventLoopFactory implements LoopInterface
         $this->workHandler = EventLoopComponentFactory::createWorkHandler(
             loopResource: $this->loopResource,
             timerManager: $this->timerManager,
-            httpRequestManager: $this->httpRequestManager,
+            curlRequestManager: $this->curlRequestManager,
             streamManager: $this->streamManager,
             fiberManager: $this->fiberManager,
             tickHandler: $this->tickHandler,
@@ -81,7 +81,7 @@ final class EventLoopFactory implements LoopInterface
             loopResource: $this->loopResource,
             timerManager: $this->timerManager,
             fiberManager: $this->fiberManager,
-            httpRequestManager: $this->httpRequestManager,
+            curlRequestManager: $this->curlRequestManager,
             streamManager: $this->streamManager,
         );
 
@@ -155,7 +155,7 @@ final class EventLoopFactory implements LoopInterface
      */
     public function addCurlRequest(string $url, array $options, callable $callback): string
     {
-        return $this->httpRequestManager->addCurlRequest($url, $options, $callback);
+        return $this->curlRequestManager->addCurlRequest($url, $options, $callback);
     }
 
     /**
@@ -163,7 +163,7 @@ final class EventLoopFactory implements LoopInterface
      */
     public function cancelCurlRequest(string $requestId): bool
     {
-        return $this->httpRequestManager->cancelCurlRequest($requestId);
+        return $this->curlRequestManager->cancelCurlRequest($requestId);
     }
 
     /**
@@ -362,7 +362,7 @@ final class EventLoopFactory implements LoopInterface
     {
         $this->tickHandler->clearAllCallbacks();
         $this->timerManager->clearAllTimers();
-        $this->httpRequestManager->clearAllRequests();
+        $this->curlRequestManager->clearAllRequests();
         $this->streamManager->clearAllWatchers();
         $this->fiberManager->prepareForShutdown();
         $this->signalManager->clearAllSignals();

@@ -3,21 +3,21 @@
 declare(strict_types=1);
 
 use Hibla\EventLoop\Drivers\StreamSelect\Handlers\SleepHandler;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 
 function makeStreamSelectSleepHandler(
     ?TimerManagerInterface $timerManager = null,
     ?FiberManagerInterface $fiberManager = null,
-    ?HttpRequestManagerInterface $httpRequestManager = null,
+    ?CurlRequestManagerInterface $curlRequestManager = null,
     ?StreamManagerInterface $streamManager = null,
 ): SleepHandler {
     return new SleepHandler(
         $timerManager ?? Mockery::mock(TimerManagerInterface::class),
         $fiberManager ?? Mockery::mock(FiberManagerInterface::class),
-        $httpRequestManager ?? Mockery::mock(HttpRequestManagerInterface::class),
+        $curlRequestManager ?? Mockery::mock(CurlRequestManagerInterface::class),
         $streamManager ?? Mockery::mock(StreamManagerInterface::class),
     );
 }
@@ -42,15 +42,15 @@ describe('SleepHandler::shouldSleep', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
         $timerManager->allows('hasReadyTimers')->andReturn(false);
 
-        $httpRequestManager = Mockery::mock(HttpRequestManagerInterface::class);
-        $httpRequestManager->allows('hasRequests')->andReturn(false);
+        $curlRequestManager = Mockery::mock(CurlRequestManagerInterface::class);
+        $curlRequestManager->allows('hasRequests')->andReturn(false);
 
         $streamManager = Mockery::mock(StreamManagerInterface::class);
         $streamManager->allows('hasWatchers')->andReturn(true);
 
         $handler = makeStreamSelectSleepHandler(
             timerManager: $timerManager,
-            httpRequestManager: $httpRequestManager,
+            curlRequestManager: $curlRequestManager,
             streamManager: $streamManager,
         );
 
@@ -61,8 +61,8 @@ describe('SleepHandler::shouldSleep', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
         $timerManager->allows('hasReadyTimers')->andReturn(false);
 
-        $httpRequestManager = Mockery::mock(HttpRequestManagerInterface::class);
-        $httpRequestManager->allows('hasRequests')->andReturn(false);
+        $curlRequestManager = Mockery::mock(CurlRequestManagerInterface::class);
+        $curlRequestManager->allows('hasRequests')->andReturn(false);
 
         $streamManager = Mockery::mock(StreamManagerInterface::class);
         $streamManager->allows('hasWatchers')->andReturn(false);
@@ -73,7 +73,7 @@ describe('SleepHandler::shouldSleep', function () {
         $handler = makeStreamSelectSleepHandler(
             timerManager: $timerManager,
             fiberManager: $fiberManager,
-            httpRequestManager: $httpRequestManager,
+            curlRequestManager: $curlRequestManager,
             streamManager: $streamManager,
         );
 
@@ -84,8 +84,8 @@ describe('SleepHandler::shouldSleep', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
         $timerManager->allows('hasReadyTimers')->andReturn(false);
 
-        $httpRequestManager = Mockery::mock(HttpRequestManagerInterface::class);
-        $httpRequestManager->allows('hasRequests')->andReturn(false);
+        $curlRequestManager = Mockery::mock(CurlRequestManagerInterface::class);
+        $curlRequestManager->allows('hasRequests')->andReturn(false);
 
         $streamManager = Mockery::mock(StreamManagerInterface::class);
         $streamManager->allows('hasWatchers')->andReturn(false);
@@ -96,7 +96,7 @@ describe('SleepHandler::shouldSleep', function () {
         $handler = makeStreamSelectSleepHandler(
             timerManager: $timerManager,
             fiberManager: $fiberManager,
-            httpRequestManager: $httpRequestManager,
+            curlRequestManager: $curlRequestManager,
             streamManager: $streamManager,
         );
 

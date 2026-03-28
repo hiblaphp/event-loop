@@ -641,13 +641,24 @@ Loop::cancelCurlRequest($id);
 
 ### Forced curl options
 
-The following options are always enforced internally and cannot be overridden:
+The following options are enforced internally by default. If you provide
+`CURLOPT_WRITEFUNCTION`, they are **not** set, allowing streaming and SSE
+responses to work correctly.
 
-| Option | Value | Reason |
+| Option | Enforced when | Reason |
 |---|---|---|
-| `CURLOPT_URL` | The `$url` argument | Always derived from the first parameter |
-| `CURLOPT_RETURNTRANSFER` | `true` | Required for the response body to be captured |
-| `CURLOPT_HEADER` | `true` | Required for the response header parser to work |
+| `CURLOPT_URL` | Always | Always derived from the `$url` argument |
+| `CURLOPT_RETURNTRANSFER` | When `CURLOPT_WRITEFUNCTION` is not set | Required for the response body to be captured |
+| `CURLOPT_HEADER` | When `CURLOPT_WRITEFUNCTION` is not set | Required for the response header parser to work |
+
+> **Streaming / SSE:** Provide `CURLOPT_WRITEFUNCTION` in your options array to
+> take full control of response buffering. When `CURLOPT_WRITEFUNCTION` is
+> present, `CURLOPT_RETURNTRANSFER` and `CURLOPT_HEADER` are intentionally **not**
+> enforced. `CURLOPT_RETURNTRANSFER` works by registering an internal write
+> function to accumulate the response body — setting both would conflict with your
+> own `CURLOPT_WRITEFUNCTION`, with unpredictable results. When streaming, data
+> should be consumed inside your write function, and the `$body` parameter of the
+> completion callback will be `null`.
 
 ### Callback parameters
 

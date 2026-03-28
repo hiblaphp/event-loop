@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-use Hibla\EventLoop\Managers\HttpRequestManager;
+use Hibla\EventLoop\Managers\CurlRequestManager;
 
-describe('HttpRequestManager', function () {
+describe('CurlRequestManager', function () {
     it('starts with no requests', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
         expect($manager->hasRequests())->toBeFalse();
     });
 
     it('can add HTTP requests', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
         $called = false;
 
         $requestId = $manager->addCurlRequest(
@@ -27,7 +27,7 @@ describe('HttpRequestManager', function () {
     });
 
     it('can cancel HTTP requests', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
         $called = false;
 
         $requestId = $manager->addCurlRequest(
@@ -47,7 +47,7 @@ describe('HttpRequestManager', function () {
     });
 
     it('provides debug information', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
 
         $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
 
@@ -66,7 +66,7 @@ describe('HttpRequestManager', function () {
     });
 
     it('can clear all requests', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
         $callCount = 0;
 
         $manager->addCurlRequest('https://httpbin.org/get', [], function () use (&$callCount) {
@@ -88,7 +88,7 @@ describe('HttpRequestManager', function () {
     });
 
     it('can clear pending requests only', function () {
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
 
         $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
         $manager->addCurlRequest('https://httpbin.org/post', [], fn () => null);
@@ -104,7 +104,7 @@ describe('HttpRequestManager', function () {
             test()->markTestSkipped('Skipped on CI environment');
         }
 
-        $manager = new HttpRequestManager();
+        $manager = new CurlRequestManager();
 
         $manager->addCurlRequest('https://httpbin.org/get', [], fn () => null);
 

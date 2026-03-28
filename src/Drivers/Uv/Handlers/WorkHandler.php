@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Drivers\Uv\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\UvTimerManagerInterface;
@@ -41,13 +41,13 @@ final class WorkHandler implements WorkHandlerInterface
     public function __construct(
         \UVLoop $uvLoop,
         private UvTimerManagerInterface $timerManager,
-        private HttpRequestManagerInterface $httpRequestManager,
+        private CurlRequestManagerInterface $curlRequestManager,
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
         private SignalManagerInterface $signalManager,
     ) {
-        $this->uvLoop    = $uvLoop;
+        $this->uvLoop = $uvLoop;
         $this->curlTimer = uv_timer_init($this->uvLoop);
     }
 
@@ -55,7 +55,7 @@ final class WorkHandler implements WorkHandlerInterface
     {
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
-            || $this->httpRequestManager->hasRequests()
+            || $this->curlRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
@@ -113,7 +113,7 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        if ($this->httpRequestManager->processRequests()) {
+        if ($this->curlRequestManager->processRequests()) {
             $workDone = true;
         }
 
@@ -126,7 +126,7 @@ final class WorkHandler implements WorkHandlerInterface
         $hasImmediateWork = $this->tickHandler->hasImmediateCallbacks()
             || $this->fiberManager->hasReadyFibers();
 
-        $flags = (!$blocking || $hasImmediateWork) ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
+        $flags = (! $blocking || $hasImmediateWork) ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
 
         \uv_run($this->uvLoop, $flags);
 
@@ -147,8 +147,8 @@ final class WorkHandler implements WorkHandlerInterface
         // The curl service timer fires inside uv_run, but processRequests()
         // here catches completions that landed in this same tick and drains
         // ticks immediately after, keeping phase ordering correct.
-        if ($this->httpRequestManager->hasRequests()) {
-            if ($this->httpRequestManager->processRequests()) {
+        if ($this->curlRequestManager->hasRequests()) {
+            if ($this->curlRequestManager->processRequests()) {
                 $workDone = true;
                 $this->processTicksAndMicrotasks();
             }
@@ -174,7 +174,7 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->tickHandler->hasMicrotaskCallbacks()
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
-            || $this->httpRequestManager->hasRequests()
+            || $this->curlRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -204,17 +204,17 @@ final class WorkHandler implements WorkHandlerInterface
      */
     private function syncCurlTimer(): void
     {
-        $hasRequests = $this->httpRequestManager->hasRequests();
+        $hasRequests = $this->curlRequestManager->hasRequests();
 
         if ($hasRequests && ! $this->curlTimerActive) {
             uv_timer_start(
                 $this->curlTimer,
-                self::CURL_TIMER_INTERVAL_MS,  
-                self::CURL_TIMER_INTERVAL_MS, 
-                function (): void {            
-                    $this->httpRequestManager->processRequests();
+                self::CURL_TIMER_INTERVAL_MS,
+                self::CURL_TIMER_INTERVAL_MS,
+                function (): void {
+                    $this->curlRequestManager->processRequests();
 
-                    if (! $this->httpRequestManager->hasRequests()) {
+                    if (! $this->curlRequestManager->hasRequests()) {
                         uv_timer_stop($this->curlTimer);
                         $this->curlTimerActive = false;
                     }
@@ -240,7 +240,7 @@ final class WorkHandler implements WorkHandlerInterface
     private function processCheckPhase(): bool
     {
         $workDone = false;
-        $queue    = $this->tickHandler->swapImmediateQueue();
+        $queue = $this->tickHandler->swapImmediateQueue();
 
         while (! $queue->isEmpty()) {
             $callback = $queue->dequeue();

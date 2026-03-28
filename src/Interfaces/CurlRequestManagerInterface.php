@@ -7,7 +7,7 @@ namespace Hibla\EventLoop\Interfaces;
 /**
  * Interface for managing HTTP request lifecycle.
  */
-interface HttpRequestManagerInterface
+interface CurlRequestManagerInterface
 {
     /**
      * Adds an HTTP request to the processing queue.

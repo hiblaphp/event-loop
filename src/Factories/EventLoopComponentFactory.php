@@ -16,8 +16,8 @@ use Hibla\EventLoop\Drivers\Uv\Managers\StreamManager as UvStreamManager;
 
 use Hibla\EventLoop\Drivers\Uv\Managers\TimerManager as UvTimerManager;
 use Hibla\EventLoop\Handlers\TickHandler;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
@@ -49,7 +49,7 @@ final class EventLoopComponentFactory
         $driver = self::resolveDriver();
 
         if ($driver === self::DRIVER_UV) {
-            if (!extension_loaded('uv')) {
+            if (! extension_loaded('uv')) {
                 throw new RuntimeException(
                     'HIBLA_LOOP_DRIVER is set to "uv" but the uv extension is not loaded.'
                 );
@@ -69,7 +69,7 @@ final class EventLoopComponentFactory
             assert(\is_string($env));
             $env = \strtolower(\trim($env));
 
-            if (!\in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {
+            if (! \in_array($env, [self::DRIVER_UV, self::DRIVER_STREAM_SELECT], true)) {
                 throw new RuntimeException(
                     sprintf(
                         'Unsupported value "%s" for %s. Supported drivers: uv, stream_select.',
@@ -90,7 +90,7 @@ final class EventLoopComponentFactory
     public static function createWorkHandler(
         ?\UVLoop $loopResource,
         TimerManagerInterface $timerManager,
-        HttpRequestManagerInterface $httpRequestManager,
+        CurlRequestManagerInterface $curlRequestManager,
         StreamManagerInterface $streamManager,
         FiberManagerInterface $fiberManager,
         TickHandler $tickHandler,
@@ -102,7 +102,7 @@ final class EventLoopComponentFactory
             return new UvWorkHandler(
                 uvLoop: $loopResource,
                 timerManager: $timerManager,
-                httpRequestManager: $httpRequestManager,
+                curlRequestManager: $curlRequestManager,
                 streamManager: $streamManager,
                 fiberManager: $fiberManager,
                 tickHandler: $tickHandler,
@@ -112,7 +112,7 @@ final class EventLoopComponentFactory
 
         return new StreamSelectWorkHandler(
             timerManager: $timerManager,
-            httpRequestManager: $httpRequestManager,
+            curlRequestManager: $curlRequestManager,
             streamManager: $streamManager,
             fiberManager: $fiberManager,
             tickHandler: $tickHandler,
@@ -124,7 +124,7 @@ final class EventLoopComponentFactory
         ?\UVLoop $loopResource,
         TimerManagerInterface $timerManager,
         FiberManagerInterface $fiberManager,
-        HttpRequestManagerInterface $httpRequestManager,
+        CurlRequestManagerInterface $curlRequestManager,
         StreamManagerInterface $streamManager,
     ): SleepHandlerInterface {
         if ($loopResource !== null) {
@@ -134,7 +134,7 @@ final class EventLoopComponentFactory
         return new StreamSelectSleepHandler(
             $timerManager,
             $fiberManager,
-            $httpRequestManager,
+            $curlRequestManager,
             $streamManager,
         );
     }

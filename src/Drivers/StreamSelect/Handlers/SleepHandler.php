@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SleepHandlerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
@@ -21,7 +21,7 @@ final class SleepHandler implements SleepHandlerInterface
         private TimerManagerInterface $timerManager,
         private FiberManagerInterface $fiberManager,
         // @phpstan-ignore-next-line
-        private HttpRequestManagerInterface $httpRequestManager,
+        private CurlRequestManagerInterface $curlRequestManager,
         private StreamManagerInterface $streamManager,
     ) {
     }

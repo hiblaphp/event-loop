@@ -6,24 +6,24 @@ namespace Hibla\EventLoop\Managers;
 
 use CurlHandle;
 use CurlMultiHandle;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
-use Hibla\EventLoop\ValueObjects\HttpRequest;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
+use Hibla\EventLoop\ValueObjects\CurlRequest;
 use RuntimeException;
 
-final class HttpRequestManager implements HttpRequestManagerInterface
+final class CurlRequestManager implements CurlRequestManagerInterface
 {
     /**
-     * @var array<string, HttpRequest>
+     * @var array<string, CurlRequest>
      */
     private array $pendingRequests = [];
 
     /**
-     * @var array<int, HttpRequest>
+     * @var array<int, CurlRequest>
      */
     private array $activeRequests = [];
 
     /**
-     * @var array<string, HttpRequest>
+     * @var array<string, CurlRequest>
      */
     private array $requestsById = [];
 
@@ -31,7 +31,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
 
     public function __construct()
     {
-        if (!extension_loaded('curl')) {
+        if (! extension_loaded('curl')) {
             throw new RuntimeException(
                 'ext-curl is required to use HTTP request features. ' .
                     'Install the curl extension or avoid calling addCurlRequest().'
@@ -46,7 +46,7 @@ final class HttpRequestManager implements HttpRequestManagerInterface
      */
     public function addCurlRequest(string $url, array $options, callable $callback): string
     {
-        $request = new HttpRequest($url, $options, $callback);
+        $request = new CurlRequest($url, $options, $callback);
         $requestId = spl_object_hash($request);
 
         $this->pendingRequests[$requestId] = $request;
@@ -73,7 +73,6 @@ final class HttpRequestManager implements HttpRequestManagerInterface
 
         if (isset($this->activeRequests[$handleId])) {
             curl_multi_remove_handle($this->multiHandle, $handle);
-            unset($handle);
             unset($this->activeRequests[$handleId]);
         }
 
@@ -115,7 +114,6 @@ final class HttpRequestManager implements HttpRequestManagerInterface
         foreach ($this->activeRequests as $request) {
             $handle = $request->getHandle();
             curl_multi_remove_handle($this->multiHandle, $handle);
-            unset($handle);
             $request->getCallback()('Request cleared', null, 0, [], null);
             unset($this->requestsById[spl_object_hash($request)]);
         }
@@ -242,20 +240,16 @@ final class HttpRequestManager implements HttpRequestManagerInterface
             }
 
             curl_multi_remove_handle($this->multiHandle, $handle);
-            unset($handle);
             unset($this->activeRequests[$handleId]);
         }
     }
 
-    private function handleSuccessfulResponse(CurlHandle $handle, HttpRequest $request): void
+    private function handleSuccessfulResponse(CurlHandle $handle, CurlRequest $request): void
     {
-        $fullResponse = curl_multi_getcontent($handle) ?? '';
+        $body = curl_multi_getcontent($handle) ?? '';
         $httpCode = curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        $headerSize = curl_getinfo($handle, CURLINFO_HEADER_SIZE);
-        $headerStr = substr($fullResponse, 0, $headerSize);
-        $body = substr($fullResponse, $headerSize);
-
         $httpVersion = curl_getinfo($handle, CURLINFO_HTTP_VERSION);
+
         $versionString = match ($httpVersion) {
             CURL_HTTP_VERSION_1_0 => '1.0',
             CURL_HTTP_VERSION_1_1 => '1.1',
@@ -263,32 +257,12 @@ final class HttpRequestManager implements HttpRequestManagerInterface
             default => (\defined('CURL_HTTP_VERSION_3') && $httpVersion === CURL_HTTP_VERSION_3) ? '3.0' : null,
         };
 
-        $parsedHeaders = [];
-        $headerLines = explode("\r\n", trim($headerStr));
-        array_shift($headerLines);
-
-        foreach ($headerLines as $line) {
-            $parts = explode(':', $line, 2);
-
-            if (\count($parts) === 2) {
-                $name = trim($parts[0]);
-                $value = trim($parts[1]);
-
-                if (isset($parsedHeaders[$name])) {
-                    if (! \is_array($parsedHeaders[$name])) {
-                        $parsedHeaders[$name] = [$parsedHeaders[$name]];
-                    }
-                    $parsedHeaders[$name][] = $value;
-                } else {
-                    $parsedHeaders[$name] = $value;
-                }
-            }
-        }
+        $parsedHeaders = $request->getCapturedHeaders();
 
         $request->executeCallback(null, $body, $httpCode, $parsedHeaders, $versionString);
     }
 
-    private function handleErrorResponse(CurlHandle $handle, HttpRequest $request): void
+    private function handleErrorResponse(CurlHandle $handle, CurlRequest $request): void
     {
         $request->executeCallback(curl_error($handle), null, null, [], null);
     }

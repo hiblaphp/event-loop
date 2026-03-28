@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Hibla\EventLoop\ValueObjects;
 
-final class HttpRequest
+final class CurlRequest
 {
     private \CurlHandle $handle;
 
@@ -14,9 +14,14 @@ final class HttpRequest
     private $callback;
 
     /**
-     *  @var non-empty-string 
+     *  @var non-empty-string
      */
     private string $url;
+
+    /**
+     *  @var array<string, string|string[]>
+     */
+    private array $capturedHeaders = [];
 
     private ?string $id = null;
 
@@ -47,18 +52,56 @@ final class HttpRequest
         curl_setopt_array($handle, $options);
         curl_setopt($handle, CURLOPT_URL, $this->url);
 
-        $hasWriteFunction  = isset($options[CURLOPT_WRITEFUNCTION]);
-        $hasHeaderFunction = isset($options[CURLOPT_HEADERFUNCTION]);
+        $hasWriteFunction = isset($options[CURLOPT_WRITEFUNCTION]);
 
-        if (!$hasWriteFunction) {
+        /** @var (callable(\CurlHandle, string): int)|null $userHeaderFunction */
+        $userHeaderFunction = isset($options[CURLOPT_HEADERFUNCTION]) && is_callable($options[CURLOPT_HEADERFUNCTION])
+            ? $options[CURLOPT_HEADERFUNCTION]
+            : null;
+
+        curl_setopt($handle, CURLOPT_HEADERFUNCTION, function ($ch, string $headerLine) use ($userHeaderFunction): int {
+            $trimmed = trim($headerLine);
+
+            if (stripos($trimmed, 'HTTP/') === 0) {
+                $this->capturedHeaders = [];
+            } elseif (str_contains($trimmed, ':')) {
+                [$name, $value] = explode(':', $trimmed, 2);
+                $name = strtolower(trim($name));
+                $value = trim($value);
+
+                if (isset($this->capturedHeaders[$name])) {
+                    if (! \is_array($this->capturedHeaders[$name])) {
+                        $this->capturedHeaders[$name] = [$this->capturedHeaders[$name]];
+                    }
+                    $this->capturedHeaders[$name][] = $value;
+                } else {
+                    $this->capturedHeaders[$name] = $value;
+                }
+            }
+
+            if ($userHeaderFunction !== null) {
+                assert($ch instanceof \CurlHandle);
+
+                return $userHeaderFunction($ch, $headerLine);
+            }
+
+            return \strlen($headerLine);
+        });
+
+        if (! $hasWriteFunction) {
             curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-        }
-        
-        if (!$hasWriteFunction && !$hasHeaderFunction) {
-            curl_setopt($handle, CURLOPT_HEADER, true);
+            curl_setopt($handle, CURLOPT_HEADER, false);
         }
 
         return $handle;
+    }
+
+    /**
+     * @return array<string, string|string[]>
+     */
+    public function getCapturedHeaders(): array
+    {
+        return $this->capturedHeaders;
     }
 
     public function getHandle(): \CurlHandle

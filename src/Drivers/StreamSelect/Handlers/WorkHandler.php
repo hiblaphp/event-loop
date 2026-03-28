@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Hibla\EventLoop\Drivers\StreamSelect\Handlers;
 
 use Hibla\EventLoop\Handlers\TickHandler;
+use Hibla\EventLoop\Interfaces\CurlRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\FiberManagerInterface;
-use Hibla\EventLoop\Interfaces\HttpRequestManagerInterface;
 use Hibla\EventLoop\Interfaces\SignalManagerInterface;
 use Hibla\EventLoop\Interfaces\StreamManagerInterface;
 use Hibla\EventLoop\Interfaces\TimerManagerInterface;
@@ -71,18 +71,19 @@ final class WorkHandler implements WorkHandlerInterface
 
     public function __construct(
         private TimerManagerInterface $timerManager,
-        private HttpRequestManagerInterface $httpRequestManager,
+        private CurlRequestManagerInterface $curlRequestManager,
         private StreamManagerInterface $streamManager,
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
         private SignalManagerInterface $signalManager,
-    ) {}
+    ) {
+    }
 
     public function hasWork(): bool
     {
         return $this->tickHandler->hasWork()
             || $this->timerManager->hasTimers()
-            || $this->httpRequestManager->hasRequests()
+            || $this->curlRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers()
             || $this->signalManager->hasSignals();
@@ -125,7 +126,7 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        $hasIO = $this->httpRequestManager->hasRequests()
+        $hasIO = $this->curlRequestManager->hasRequests()
             || $this->streamManager->hasWatchers();
 
         if ($hasIO) {
@@ -156,7 +157,7 @@ final class WorkHandler implements WorkHandlerInterface
             || $this->tickHandler->hasMicrotaskCallbacks()
             || $this->tickHandler->hasImmediateCallbacks()
             || $this->timerManager->hasTimers()
-            || $this->httpRequestManager->hasRequests()
+            || $this->curlRequestManager->hasRequests()
             || $this->streamManager->hasWatchers()
             || $this->fiberManager->hasFibers();
 
@@ -272,7 +273,7 @@ final class WorkHandler implements WorkHandlerInterface
     {
         $workDone = false;
 
-        if ($this->httpRequestManager->processRequests()) {
+        if ($this->curlRequestManager->processRequests()) {
             $workDone = true;
         }
 
@@ -288,7 +289,7 @@ final class WorkHandler implements WorkHandlerInterface
             return $workDone;
         }
 
-        if ($this->httpRequestManager->hasRequests() && $blocking) {
+        if ($this->curlRequestManager->hasRequests() && $blocking) {
             // Case 2: HTTP in flight, no streams to watch.
             // Skip the sleep when immediate work is already queued so that
             // ticks, microtasks, fibers, and timers are never delayed by curl.
