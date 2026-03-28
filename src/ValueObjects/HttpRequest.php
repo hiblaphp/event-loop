@@ -15,7 +15,7 @@ final class HttpRequest
 
     /**
      *  @var non-empty-string 
-     */ 
+     */
     private string $url;
 
     private ?string $id = null;
@@ -46,8 +46,17 @@ final class HttpRequest
 
         curl_setopt_array($handle, $options);
         curl_setopt($handle, CURLOPT_URL, $this->url);
-        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($handle, CURLOPT_HEADER, true);
+
+        $hasWriteFunction  = isset($options[CURLOPT_WRITEFUNCTION]);
+        $hasHeaderFunction = isset($options[CURLOPT_HEADERFUNCTION]);
+
+        if (!$hasWriteFunction) {
+            curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
+        }
+        
+        if (!$hasWriteFunction && !$hasHeaderFunction) {
+            curl_setopt($handle, CURLOPT_HEADER, true);
+        }
 
         return $handle;
     }
