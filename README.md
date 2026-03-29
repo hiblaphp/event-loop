@@ -78,16 +78,16 @@ composer require hiblaphp/event-loop
 
 **Requirements:**
 - PHP 8.3+
-- `ext-curl` (required only if you use `Loop::addCurlRequest()` — a
+- `ext-curl` (required only if you use `Loop::addCurlRequest()`; a
   `RuntimeException` is thrown at runtime if curl is not loaded)
 - `ext-pcntl` + `ext-posix` (Unix/macOS only, required for signal handling)
-- `ext-uv` (optional — enables the UV driver for better performance)
+- `ext-uv` (optional; enables the UV driver for better performance)
 
 ---
 
 ## Introduction
 
-PHP has traditionally been synchronous — one line runs, finishes, and only then
+PHP has traditionally been synchronous: one line runs, finishes, and only then
 does the next begin. Every blocking call, every database query, every HTTP
 request holds the entire script hostage for its duration. This works fine for
 short-lived request-response cycles, but falls apart the moment you need to
@@ -97,22 +97,22 @@ process for each one.
 
 The solution is to invert the model. Instead of code waiting on I/O, you
 register what should happen when I/O arrives and hand control back immediately.
-A scheduler — the event loop — watches all the pending work at once, wakes up
-exactly when something is ready, and dispatches the right callback. Between
-events, the thread is free. No busy-spinning, no blocking, no wasted cycles.
+The event loop acts as a scheduler: it watches all the pending work at once,
+wakes up exactly when something is ready, and dispatches the right callback.
+Between events, the thread is free. No busy-spinning, no blocking, no wasted cycles.
 
 PHP 8.1 Fibers make this model dramatically more powerful. A Fiber is a
-pausable unit of execution that owns its own full call stack — it can suspend
+pausable unit of execution that owns its own full call stack. It can suspend
 from anywhere inside it, no matter how deeply nested, and be resumed exactly
 where it left off. This means async code no longer has to be written as chains
 of callbacks. A function can suspend deep inside your application, the entire
 call stack freezes, the event loop picks up the next ready Fiber, and execution
-resumes later as if nothing happened — code that reads top to bottom like
+resumes later as if nothing happened: code that reads top to bottom like
 ordinary synchronous PHP, but runs cooperatively under the hood.
 
-The loop's I/O backend is selected at startup: when `ext-uv` is available it
+The loop's I/O backend is selected at startup. When `ext-uv` is available it
 delegates to libuv, using `epoll`, `kqueue`, or `IOCP` depending on the
-platform; without it, a pure PHP `stream_select` implementation takes over with
+platform. Without it, a pure PHP `stream_select` implementation takes over with
 no extra dependencies. Either way, the API is identical.
 
 ---
@@ -120,7 +120,7 @@ no extra dependencies. Either way, the API is identical.
 ## Zero Boilerplate: Auto-Run
 
 The event loop registers itself via `register_shutdown_function`. Any work you
-schedule — timers, HTTP requests, fibers — will automatically be processed when
+schedule (timers, HTTP requests, fibers) will automatically be processed when
 your script reaches the end, without you ever calling `Loop::run()`:
 ```php
 use Hibla\EventLoop\Loop;
@@ -141,7 +141,7 @@ Loop::run(); // Blocks until all work is exhausted or stop() is called
 ### Auto-run fires after all synchronous code finishes
 
 The loop does not start until the current script has finished executing
-top-level synchronous code. Work you schedule does not interrupt the script —
+top-level synchronous code. Work you schedule does not interrupt the script;
 it waits until the script reaches the end and the shutdown function fires:
 ```php
 Loop::nextTick(function () {
@@ -158,7 +158,7 @@ echo "end\n";
 > **Important:** Auto-run will not trigger if the script terminates abnormally.
 > This includes unhandled exceptions, fatal errors (`E_ERROR`, `E_CORE_ERROR`,
 > `E_COMPILE_ERROR`, etc.), or an explicit `exit()`/`die()` call. In these
-> cases any pending work — timers, in-flight HTTP requests, queued fibers —
+> cases any pending work (timers, in-flight HTTP requests, queued fibers)
 > will be silently abandoned.
 >
 > If your application relies on deferred work completing reliably, always call
@@ -185,9 +185,9 @@ Each iteration:
 
 1. Signal      dispatch any pending OS signals
      │
-2. nextTick    highest priority — drained completely before anything else
+2. nextTick    highest priority, drained completely before anything else
      │
-3. Microtask   promise resolution — drained after nextTick
+3. Microtask   promise resolution, drained after nextTick
      │
 4. Timers      ready timers fire one at a time
      │         nextTick + microtasks drain after each timer
@@ -201,12 +201,12 @@ Each iteration:
 7. Check       setImmediate() callbacks
      │         nextTick + microtasks drain after each callback
      │
-8. Deferred    runs only when phases 2–7 are all empty
+8. Deferred    runs only when phases 2-7 are all empty
 ```
 
 The nextTick and microtask queues drain completely after every phase transition.
 This is what keeps Promise resolution, timer callbacks, and Fiber resumption
-predictable — high-priority callbacks are never starved by lower-priority work
+predictable: high-priority callbacks are never starved by lower-priority work
 accumulating in other phases.
 
 | # | Phase | Method | Description |
@@ -215,10 +215,10 @@ accumulating in other phases.
 | 2 | nextTick | `Loop::nextTick()` | Highest priority. Drained completely before anything else |
 | 3 | Microtask | `Loop::microTask()` | Runs after nextTick, before timers. Used internally for Promise resolution |
 | 4 | Timers | `Loop::addTimer()` | Ready timers execute one at a time. nextTick + microtasks drain after each |
-| 5 | I/O | streams, HTTP | `stream_select` / `uv_run` — wakes when I/O is ready or next timer is due |
+| 5 | I/O | streams, HTTP | `stream_select` / `uv_run`, wakes when I/O is ready or next timer is due |
 | 6 | Fibers | `Loop::addFiber()` | All ready fibers are processed. nextTick + microtasks drain after each |
 | 7 | Check | `Loop::setImmediate()` | Runs after I/O. New calls during this phase land in the next iteration |
-| 8 | Deferred | `Loop::defer()` | Runs only when phases 2–7 are all completely empty |
+| 8 | Deferred | `Loop::defer()` | Runs only when phases 2-7 are all completely empty |
 
 ---
 
@@ -227,7 +227,7 @@ accumulating in other phases.
 ### `nextTick` — before everything else
 
 `nextTick` callbacks have the highest priority in the loop. They run before
-timers, before I/O, before fibers — before anything else in the next iteration.
+timers, before I/O, before fibers, before anything else in the next iteration.
 The entire nextTick queue drains completely before the loop advances to any
 other phase.
 
@@ -260,9 +260,9 @@ class EventEmitter
 
 $emitter = new EventEmitter();
 
-$emitter->emit('data', 'hello'); // schedules emission — does NOT fire yet
+$emitter->emit('data', 'hello'); // schedules emission, does NOT fire yet
 
-// This listener is attached AFTER emit() — it still receives the event
+// This listener is attached AFTER emit() and it still receives the event
 // because emission is deferred to nextTick
 $emitter->on('data', fn($d) => print("received: $d\n"));
 
@@ -301,8 +301,8 @@ function processChunks(array $items): void
 ### `microTask` — Promise resolution
 
 `microTask` callbacks run after all `nextTick` callbacks in a given drain
-cycle, but before timers and I/O. They exist specifically for Promise resolution
-— when a Promise settles, its `.then()` callbacks are queued as microtasks so
+cycle, but before timers and I/O. They exist specifically for Promise resolution:
+when a Promise settles, its `.then()` callbacks are queued as microtasks so
 they fire before any new I/O or timers get a turn.
 
 You rarely need to call `Loop::microTask()` directly in application code. It is
@@ -356,12 +356,12 @@ Loop::microTask(fn() => print("3 — microtask\n"));
 
 ### `setImmediate` — after I/O, before the next iteration
 
-`setImmediate` callbacks run in the check phase — after I/O has been processed
+`setImmediate` callbacks run in the check phase: after I/O has been processed
 for the current iteration, but before the loop sleeps and waits for the next
 event. This makes it the right tool when you want to do work that responds to
 I/O results without delaying the next I/O poll.
 
-The check phase uses a queue swap — any `setImmediate` call made during the
+The check phase uses a queue swap: any `setImmediate` call made during the
 check phase lands in a fresh queue for the next iteration, not the current one.
 This prevents check-phase callbacks from starving timers and I/O by
 continuously scheduling new work into the same phase:
@@ -393,21 +393,21 @@ Loop::addReadWatcher($socket, function ($socket) use (&$batch) {
 
 The contrast with `nextTick`:
 ```
-nextTick     — fires before I/O in the next iteration
-setImmediate — fires after I/O in the current iteration
+nextTick     fires before I/O in the next iteration
+setImmediate fires after I/O in the current iteration
 ```
 
 ---
 
 ### `defer` — when the loop is truly idle
 
-`defer` callbacks run only when all other work is exhausted — the nextTick
+`defer` callbacks run only when all other work is exhausted: the nextTick
 queue is empty, the microtask queue is empty, no timers are ready, no I/O is
 pending, no fibers are ready, and the check queue is empty. If any of those
 phases have work, deferred callbacks wait.
 
 Signal handlers are intentionally excluded from this check. A registered signal
-listener is edge-triggered — it means "call me if this signal arrives", not
+listener is edge-triggered, meaning "call me if this signal arrives", not
 "there is pending work to do". A `SIGTERM` handler registered for graceful
 shutdown may never fire on a normal exit. Treating it as pending work would
 prevent deferred callbacks from ever running in long-lived processes that hold
@@ -415,8 +415,8 @@ signal listeners for their entire lifetime:
 ```php
 Loop::addSignal(SIGTERM, fn() => Loop::stop()); // registered for lifetime of process
 
-// This WILL run even though the SIGTERM listener is still registered —
-// signals are not considered pending work for the purpose of defer
+// This WILL run even though the SIGTERM listener is still registered.
+// Signals are not considered pending work for the purpose of defer.
 Loop::defer(function () {
     logger()->debug('Loop idle — all pending work complete');
 });
@@ -437,15 +437,15 @@ function handleRequest(Connection $conn): void
 
 The contrast with `setImmediate`:
 ```
-setImmediate — fires after I/O even if more timers and fibers are pending
-defer        — fires only when there is genuinely nothing else left to do
+setImmediate fires after I/O even if more timers and fibers are pending
+defer        fires only when there is genuinely nothing else left to do
 ```
 
 ---
 
 ### Choosing the right queue
 ```
-Is the work urgent — must fire before any I/O or timers?
+Is the work urgent and must fire before any I/O or timers?
   └─► nextTick
 
 Is this a Promise resolution callback?
@@ -475,7 +475,7 @@ Loop::nextTick(function () {
 ```
 
 If you need to schedule recurring high-priority work without starving the loop,
-use `Loop::setImmediate()` instead — it runs in the check phase after I/O and
+use `Loop::setImmediate()` instead. It runs in the check phase after I/O, and
 new calls made during the check phase are deferred to the next iteration,
 preventing starvation.
 
@@ -529,18 +529,17 @@ Tick 4: 4.150s                     Tick 4: 4.000s
 ```
 
 If a callback takes longer than its own interval, the loop does not attempt to
-catch up on missed ticks — it resets the next fire time to `now + interval`
-instead:
+catch up on missed ticks. Instead it resets the next fire time to `now + interval`:
 ```
 Interval: 100ms
 
 t=0ms    Tick 1 fires, callback starts
-t=300ms  Callback finishes (took 300ms — 2 ticks overdue)
+t=300ms  Callback finishes (took 300ms, 2 ticks overdue)
 t=400ms  Tick 2 fires  ← resets from now, does NOT try to catch up
 t=500ms  Tick 3 fires
 ```
 
-For most workloads — heartbeats, polling, metrics emission — this behavior is
+For most workloads (heartbeats, polling, metrics emission) this behavior is
 exactly what you want. Missed ticks are dropped silently rather than flooding
 the loop with catch-up work. If you need a guaranteed cadence where every tick
 fires regardless of how long the previous one took, self-schedule instead:
@@ -595,7 +594,7 @@ Loop::addPeriodicTimer(1.0, function (string $timerId) {
 
 > **Note:** `Loop::addCurlRequest()` is a low-level primitive that requires
 > manual curl option management. For most use cases you should use
-> [`hiblaphp/http-client`](https://github.com/hiblaphp/http-client) which
+> [`hiblaphp/http-client`](https://github.com/hiblaphp/http-client), which
 > provides a clean abstraction API built on top of this primitive.
 
 ### Basic usage
@@ -622,7 +621,7 @@ Loop::addCurlRequest(
 ### Running requests concurrently
 
 All requests registered before the loop ticks are admitted into `curl_multi`
-together and processed concurrently. There is no special API needed — just
+together and processed concurrently. There is no special API needed; just
 register multiple requests and they will run in parallel:
 ```php
 Loop::addCurlRequest('https://api.example.com/users', [], fn(...$args) => handleUsers(...$args));
@@ -655,8 +654,8 @@ responses to work correctly.
 > take full control of response buffering. When `CURLOPT_WRITEFUNCTION` is
 > present, `CURLOPT_RETURNTRANSFER` and `CURLOPT_HEADER` are intentionally **not**
 > enforced. `CURLOPT_RETURNTRANSFER` works by registering an internal write
-> function to accumulate the response body — setting both would conflict with your
-> own `CURLOPT_WRITEFUNCTION`, with unpredictable results. When streaming, data
+> function to accumulate the response body. Setting both would conflict with your
+> own `CURLOPT_WRITEFUNCTION` with unpredictable results. When streaming, data
 > should be consumed inside your write function, and the `$body` parameter of the
 > completion callback will be `null`.
 
@@ -675,7 +674,7 @@ responses to work correctly.
 ## Stream Watchers
 
 > **Note:** The stream watcher API is a low-level primitive. For most use cases
-> — TCP servers, clients, pipes — you should use
+> (TCP servers, clients, pipes) you should use
 > [`hiblaphp/stream`](https://github.com/hiblaphp/stream), which provides a
 > high-level abstraction built on top of these primitives.
 
@@ -684,7 +683,7 @@ responses to work correctly.
 Stream watchers notify you when a stream resource is ready for reading or
 writing. The stream must be set to non-blocking mode before registering a
 watcher. The stream resource must also remain open and valid for the entire
-lifetime of the watcher — always remove the watcher before closing the stream:
+lifetime of the watcher; always remove the watcher before closing the stream:
 ```php
 $stream = stream_socket_client('tcp://example.com:80', $errno, $errstr, 0, STREAM_CLIENT_ASYNC_CONNECT);
 stream_set_blocking($stream, false);
@@ -726,7 +725,7 @@ Loop::addReadWatcher($file, $callback);   // UV driver: unsupported handle type
 Loop::addReadWatcher($memory, $callback); // UV driver: unsupported handle type
 ```
 
-This is a libuv limitation — `uv_poll` only operates on handles backed by a
+This is a libuv limitation. `uv_poll` only operates on handles backed by a
 real OS socket or pipe file descriptor. Regular files and virtual streams do not
 have a pollable fd.
 
@@ -779,16 +778,14 @@ Loop::removeSignal($id1); // Only removes listener 1, listener 2 still active
 
 ## Fibers
 
-## Fibers
-
-> **Note:** The fiber API and loop fiber api are low-level primitives primarily intended for
+> **Note:** The fiber API and loop fiber API are low-level primitives primarily intended for
 > building Promise, Future, and coroutine abstractions. If you are consuming
 > Hibla's higher-level packages, you will likely interact with Promises rather
 > than fibers directly.
 
 ### What is a Fiber
 
-A Fiber is a pausable function — a block of code that can suspend itself
+A Fiber is a pausable function: a block of code that can suspend itself
 mid-execution, hand control back to whatever started it, and later be resumed
 exactly where it left off. Unlike a regular function call, which runs to
 completion and returns once, a Fiber can yield control multiple times before it
@@ -811,12 +808,12 @@ $fiber->resume(); // resumes the fiber from where it left off
 ```
 
 **Fibers are not inherently asynchronous.** A Fiber on its own is still
-synchronous — `start()` and `resume()` are blocking calls that run the fiber to
+synchronous. `start()` and `resume()` are blocking calls that run the fiber to
 its next suspend point before returning. Two fibers do not run concurrently by
 themselves. Without a scheduler deciding when to start and resume each one, a
 fiber that blocks on I/O simply blocks the entire thread:
 ```
-Without a scheduler — fibers block just like plain functions:
+Without a scheduler, fibers block just like plain functions:
 
 Fiber A: fread()  ← blocks here, nothing else runs
 Fiber B:          ← never gets a turn until A unblocks
@@ -833,16 +830,16 @@ The fiber is the mechanism. The event loop is what makes it async.
 
 ---
 
-### Fibers are stackful — unlike generators
+### Fibers are stackful, unlike generators
 
-PHP generators can also pause and resume, but they are stackless — a generator
+PHP generators can also pause and resume, but they are stackless: a generator
 can only suspend from the top level of its own body. It cannot suspend from
 inside a function it called. Every layer in the call stack that wants to
 participate in suspension must itself be a generator and explicitly propagate
 the yield upward.
 
-Fibers have no such restriction. A Fiber is stackful — it owns its own full
-call stack, and `Fiber::suspend()` can be called from anywhere within that
+Fibers have no such restriction. A Fiber is stackful, meaning it owns its own
+full call stack, and `Fiber::suspend()` can be called from anywhere within that
 stack, no matter how deeply nested. None of the intermediate callers need to
 know or care that a suspension happened:
 ```php
@@ -876,14 +873,14 @@ $fiber->resume(); // restores the entire call stack and continues
 
 This is what makes fibers the right foundation for `await()`. A single
 `Fiber::suspend()` call inside the deepest layer of your application can pause
-the entire operation and hand control back to the event loop — without any of
+the entire operation and hand control back to the event loop, without any of
 the intermediate code needing to be rewritten.
 
 ---
 
 ### Cooperative scheduling model
 
-Only one fiber runs at a time. The event loop does not run fibers in parallel —
+Only one fiber runs at a time. The event loop does not run fibers in parallel;
 it runs one fiber, waits for it to either suspend or terminate, then moves on
 to the next. A fiber that never suspends will run to completion before any other
 fiber in the queue gets a turn:
@@ -907,7 +904,7 @@ Loop::addFiber(new Fiber(function () {
 // Fiber 2 — resumed
 ```
 
-This cooperative model is what makes fibers safe to use with shared state —
+This cooperative model is what makes fibers safe to use with shared state:
 there are no race conditions because only one fiber is ever executing at a given
 moment. The tradeoff is that a fiber which blocks or never suspends monopolizes
 the loop until it finishes.
@@ -937,7 +934,7 @@ echo "B — This prints before the fiber starts\n";
 
 Once a fiber calls `Fiber::suspend()`, it moves to a suspended state and will
 never be automatically resumed. You must explicitly call `Loop::scheduleFiber()`
-to tell the event loop to resume it — for example, after an HTTP response
+to tell the event loop to resume it, for example after an HTTP response
 arrives, a timer fires, or a stream becomes readable:
 ```php
 $fiber = new Fiber(function () {
@@ -956,7 +953,7 @@ Loop::addTimer(1.0, function () use ($fiber) {
 The lifecycle is strictly linear. A fiber that bypasses `addFiber()` is
 invisible to the loop regardless of its suspended state:
 ```
-addFiber() → readyQueue → processFibers() → suspendedFibers → scheduleFiber() → readyQueue
+addFiber() -> readyQueue -> processFibers() -> suspendedFibers -> scheduleFiber() -> readyQueue
                                                     ↑
                           fibers started outside the loop never reach here
 ```
@@ -1041,7 +1038,7 @@ $promise = async(function () {
 $promise->then(fn($result) => print("Done: $result\n"));
 ```
 
-No callbacks, no chaining — the fiber handles the suspension and resumption
+No callbacks, no chaining. The fiber handles the suspension and resumption
 transparently, while the event loop continues processing other timers, I/O, and
 fibers while each `await()` is suspended.
 
@@ -1055,12 +1052,12 @@ Loop::run();
 // Process exactly one full iteration, then invoke the sleep handler
 Loop::runOnce();
 
-// Graceful stop — finishes the current iteration then exits.
+// Graceful stop: finishes the current iteration then exits.
 // Allows up to 10 additional iterations with a 2 second timeout for
 // in-flight work to complete before forcing a shutdown.
 Loop::stop();
 
-// Immediate stop — clears all queues and exits now, no cleanup
+// Immediate stop: clears all queues and exits now, no cleanup
 Loop::forceStop();
 
 // Introspection
@@ -1095,36 +1092,36 @@ The `stream_select` driver is built entirely on PHP's built-in `stream_select()`
 function, which is a thin wrapper around the operating system's `select()`
 syscall. Each iteration calls `stream_select()` with a timeout derived from the
 next pending timer, so it blocks efficiently until either I/O arrives or the
-next timer is due — it does not busy-spin.
+next timer is due. It does not busy-spin.
 
 Two limitations come from `select()` itself, not from PHP. Most operating
 systems impose a hard cap of **1024 file descriptors** on a single `select()`
 call (`FD_SETSIZE = 1024`), meaning the driver can watch at most 1024
 simultaneous connections at one time. Beyond this, `select()` has an O(N)
-readiness model — the kernel linearly scans every watched file descriptor on
+readiness model: the kernel linearly scans every watched file descriptor on
 every call, so the cost grows with the number of watched connections even when
 most of them are idle.
 
-For the majority of applications — background jobs, scheduled tasks, moderate
-HTTP workloads, CLI tooling — neither limit is ever reached in practice, and
+For the majority of applications (background jobs, scheduled tasks, moderate
+HTTP workloads, CLI tooling) neither limit is ever reached in practice, and
 `stream_select` is a perfectly capable driver with no additional dependencies.
 
 ### `uv` (libuv via `ext-uv`)
 
 The UV driver delegates all I/O, timers, and signals to
-[libuv](https://libuv.org) — the same event loop library that powers Node.js.
+[libuv](https://libuv.org), the same event loop library that powers Node.js.
 libuv uses `epoll` on Linux, `kqueue` on macOS, and `IOCP` on Windows. These
 are modern kernel interfaces that scale to tens of thousands of concurrent
 connections without the file descriptor cap that `select()` imposes.
 
-libuv's underlying interfaces use an O(1) readiness model — the kernel
+libuv's underlying interfaces use an O(1) readiness model: the kernel
 maintains an internal interest list and delivers only the descriptors that have
 actual activity. Whether you are watching 10 connections or 10,000, the cost of
 a `uv_run` iteration does not grow with the number of idle watchers.
 
-The tradeoff is that `ext-uv` must be compiled and installed separately and —
-as noted in the [Stream Watchers](#ext-uv-limitation-file-handles-and-in-memory-streams)
-section — `uv_poll` only supports true socket and pipe file descriptors. Regular
+The tradeoff is that `ext-uv` must be compiled and installed separately and, as
+noted in the [Stream Watchers](#ext-uv-limitation-file-handles-and-in-memory-streams)
+section, `uv_poll` only supports true socket and pipe file descriptors. Regular
 file handles and in-memory PHP streams are not supported.
 
 ### Driver comparison
@@ -1133,12 +1130,12 @@ file handles and in-memory PHP streams are not supported.
 |---|---|---|
 | **Dependency** | None (pure PHP) | `ext-uv` required |
 | **I/O mechanism** | `select()` syscall | `epoll` / `kqueue` / `IOCP` via libuv |
-| **Readiness model** | O(N) — kernel scans all watched fds | O(1) — kernel delivers only active fds |
+| **Readiness model** | O(N): kernel scans all watched fds | O(1): kernel delivers only active fds |
 | **Max concurrent streams** | ~1024 (OS `FD_SETSIZE` limit) | Tens of thousands |
 | **File handle support** | All PHP stream resources | Sockets and pipes only |
 | **In-memory streams** | `php://memory`, `php://temp` | Not supported |
 | **Timers** | PHP-land `SplPriorityQueue` + `hrtime` | Single master `UVTimer` per loop |
-| **Signals** | `pcntl_signal_dispatch()` each tick | `UVSignal` — native inside `uv_run` |
+| **Signals** | `pcntl_signal_dispatch()` each tick | `UVSignal`: native inside `uv_run` |
 | **Recommended for** | General use, low-to-moderate load | High-concurrency production workloads |
 
 ---
@@ -1221,7 +1218,7 @@ Run static analysis:
 
 - **API Design:** Inspired by the [ReactPHP EventLoop](https://github.com/reactphp/event-loop)
   `Loop` API. If you are familiar with ReactPHP's loop interface, Hibla's API
-  will feel immediately familiar — with the addition of native Fiber scheduling,
+  will feel immediately familiar, with the addition of native Fiber scheduling,
   built-in `curl_multi` integration, and a strict Node.js-style phase-based
   execution model.
 - **Philosophy:** Inspired by Node.js event loop semantics and the libuv
