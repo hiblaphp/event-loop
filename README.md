@@ -82,7 +82,7 @@ composer require hiblaphp/event-loop:^1.0@alpha
 ```
 
 **Requirements:**
-- PHP 8.3+
+- PHP 8.4+
 - `ext-curl` (required only if you use `Loop::addCurlRequest()`; a
   `RuntimeException` is thrown at runtime if curl is not loaded)
 - `ext-pcntl` + `ext-posix` (Unix/macOS only, required for signal handling)
