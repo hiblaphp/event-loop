@@ -9,6 +9,8 @@ Designed as the foundation layer for higher-level Hibla packages or as the
 foundation for other async ecosystems.
 
 [![Latest Release](https://img.shields.io/github/release/hiblaphp/event-loop.svg?style=flat-square)](https://github.com/hiblaphp/event-loop/releases)
+[![Tests](https://github.com/hiblaphp/event-loop/actions/workflows/test.yml/badge.svg)](https://github.com/hiblaphp/event-loop/actions/workflows/test.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/hiblaphp/event-loop.svg?style=flat-square)](https://packagist.org/packages/hiblaphp/event-loop)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 
 ---
@@ -594,7 +596,7 @@ Loop::addPeriodicTimer(1.0, function (string $timerId) {
 
 > **Note:** `Loop::addCurlRequest()` is a low-level primitive that requires
 > manual curl option management. For most use cases you should use
-> [`hiblaphp/http-client`](https://github.com/hiblaphp/http-client), which
+> [`hiblaphp/event-loop`](https://github.com/hiblaphp/event-loop), which
 > provides a clean abstraction API built on top of this primitive.
 
 ### Basic usage
