@@ -78,14 +78,14 @@ foundation for other async ecosystems.
 >Hibla Event Loop is currently in its Alpha development phase. You can install the library via Composer by explicitly allowing alpha stability:
 
 ```bash
-composer require hiblaphp/event-loop:^1.0@alpha
+composer require hiblaphp/event-loop:"^1.0@alpha"
 ```
 
 **Requirements:**
 - PHP 8.4+
 - `ext-curl` (required only if you use `Loop::addCurlRequest()`; a
   `RuntimeException` is thrown at runtime if curl is not loaded)
-- `ext-pcntl` + `ext-posix` (Unix/macOS only, required for signal handling)
+- `ext-pcntl` (Unix/macOS only, required for signal handling)
 - `ext-uv` (optional; enables the UV driver for better performance)
 
 ---
