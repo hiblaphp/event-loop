@@ -209,7 +209,11 @@ final class CurlRequestManager implements CurlRequestManagerInterface
 
         do {
             curl_multi_exec($this->multiHandle, $running);
-            curl_multi_select($this->multiHandle);
+
+            if ($running > 0 && curl_multi_select($this->multiHandle) === -1) {
+                time_nanosleep(0, 1_000_000);
+            }
+
         } while ($running > 0);
 
         if (! \is_int($running)) {
