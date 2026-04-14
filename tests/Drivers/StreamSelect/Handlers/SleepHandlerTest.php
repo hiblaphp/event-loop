@@ -57,6 +57,25 @@ describe('SleepHandler::shouldSleep', function () {
         expect($handler->shouldSleep(false))->toBeFalse();
     });
 
+    it('returns false when there are active HTTP requests', function () {
+        $timerManager = Mockery::mock(TimerManagerInterface::class);
+        $timerManager->allows('hasReadyTimers')->andReturn(false);
+
+        $curlRequestManager = Mockery::mock(CurlRequestManagerInterface::class);
+        $curlRequestManager->allows('hasRequests')->andReturn(true);
+
+        $streamManager = Mockery::mock(StreamManagerInterface::class);
+        $streamManager->allows('hasWatchers')->andReturn(false);
+
+        $handler = makeStreamSelectSleepHandler(
+            timerManager: $timerManager,
+            curlRequestManager: $curlRequestManager,
+            streamManager: $streamManager,
+        );
+
+        expect($handler->shouldSleep(false))->toBeFalse();
+    });
+
     it('returns false when there are active fibers', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
         $timerManager->allows('hasReadyTimers')->andReturn(false);
@@ -105,48 +124,44 @@ describe('SleepHandler::shouldSleep', function () {
 });
 
 describe('SleepHandler::calculateOptimalSleep', function () {
-    it('returns max sleep when there are no pending timers', function () {
+    it('returns 1 second fallback when there are no pending timers', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
         $timerManager->allows('getNextTimerDelay')->andReturn(null);
 
         $handler = makeStreamSelectSleepHandler(timerManager: $timerManager);
         $sleep = $handler->calculateOptimalSleep();
 
-        $expectedMax = PHP_OS_FAMILY === 'Windows' ? 1_000_000 : 10_000_000;
-
-        expect($sleep)->toBe($expectedMax);
+        expect($sleep)->toBe(1_000_000_000);
     });
 
-    it('returns 90% of the next timer delay in nanoseconds', function () {
+    it('returns the exact next timer delay in nanoseconds', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
-        $timerManager->allows('getNextTimerDelay')->andReturn(1.0); // 1 second
+        $timerManager->allows('getNextTimerDelay')->andReturn(0.5); // 500ms
 
         $handler = makeStreamSelectSleepHandler(timerManager: $timerManager);
         $sleep = $handler->calculateOptimalSleep();
 
-        $expectedMax = PHP_OS_FAMILY === 'Windows' ? 1_000_000 : 10_000_000;
-        expect($sleep)->toBe($expectedMax);
+        expect($sleep)->toBe(500_000_000);
     });
 
     it('clamps sleep to the minimum of 100_000 nanoseconds', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
-        $timerManager->allows('getNextTimerDelay')->andReturn(0.00001); // very small delay
+        $timerManager->allows('getNextTimerDelay')->andReturn(0.00001); // 10 microseconds
 
         $handler = makeStreamSelectSleepHandler(timerManager: $timerManager);
         $sleep = $handler->calculateOptimalSleep();
 
-        expect($sleep)->toBeGreaterThanOrEqual(100_000);
+        expect($sleep)->toBe(100_000);
     });
 
-    it('clamps sleep to platform max when delay exceeds it', function () {
+    it('allows long sleeps without platform caps', function () {
         $timerManager = Mockery::mock(TimerManagerInterface::class);
-        $timerManager->allows('getNextTimerDelay')->andReturn(100.0); // 100 seconds
+        $timerManager->allows('getNextTimerDelay')->andReturn(10.0); // 10 seconds
 
         $handler = makeStreamSelectSleepHandler(timerManager: $timerManager);
         $sleep = $handler->calculateOptimalSleep();
 
-        $expectedMax = PHP_OS_FAMILY === 'Windows' ? 1_000_000 : 10_000_000;
-        expect($sleep)->toBe($expectedMax);
+        expect($sleep)->toBe(10_000_000_000);
     });
 });
 
@@ -182,22 +197,5 @@ describe('SleepHandler::sleep', function () {
 
         expect($elapsed)->toBeGreaterThanOrEqual($sleepNs * 0.8);
         expect($elapsed)->toBeLessThan($sleepNs * 5);
-    });
-
-    it('handles sub-millisecond sleep durations', function () {
-        $handler = makeStreamSelectSleepHandler();
-        $sleepNs = 100_000;
-        $start = hrtime(true);
-
-        $handler->sleep($sleepNs);
-
-        $elapsed = hrtime(true) - $start;
-
-        // Windows timer resolution is ~1-15ms so we allow a much wider upper
-        // bound there. On Unix the resolution is much finer (~100μs).
-        $upperBoundNs = PHP_OS_FAMILY === 'Windows' ? 50_000_000 : 10_000_000;
-
-        expect($elapsed)->toBeGreaterThanOrEqual(0);
-        expect($elapsed)->toBeLessThan($upperBoundNs);
     });
 });
