@@ -599,7 +599,7 @@ Loop::addPeriodicTimer(1.0, function (string $timerId) {
 
 > **Note:** `Loop::addCurlRequest()` is a low-level primitive that requires
 > manual curl option management. For most use cases you should use
-> [`hiblaphp/event-loop`](https://github.com/hiblaphp/event-loop), which
+> [`hiblaphp/http-client`](https://github.com/hiblaphp/http-client), which
 > provides a clean abstraction API built on top of this primitive.
 
 ### Basic usage
