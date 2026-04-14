@@ -41,31 +41,13 @@ final class WorkHandler implements WorkHandlerInterface
     private const int MICROSECONDS_PER_SECOND = 1_000_000;
 
     /**
-     * Buffer factor applied to the next timer delay before passing it to
-     * stream_select. Wakes up slightly before the timer fires to account
-     * for scheduling jitter, matching the strategy used in SleepHandler.
-     */
-    private const float TIMER_BUFFER_FACTOR = 0.9;
-
-    /**
-     * How long to sleep (in microseconds) between curl_multi_exec polls when
-     * HTTP requests are in flight but no stream watchers are registered.
+     * Maximum time to block in stream_select (in microseconds) when both stream
+     * watchers and HTTP requests are active simultaneously.
      *
-     * Matches the UV driver's 10ms curl service timer interval.
-     * Real HTTP latency is always dominated by network round-trip time
-     * (typically 20ms–500ms+) so 10ms polling adds no perceptible latency
-     * while keeping CPU near zero between ticks.
-     *
-     * Windows: usleep is backed by Sleep() which has a default timer resolution
-     * of 15.6ms — even usleep(1) can sleep anywhere from 1ms to 15ms depending
-     * on the current system timer resolution. We use 1ms here as a best-effort
-     * yield hint rather than a precise interval. SleepHandler's WINDOWS_MAX_SLEEP_NS
-     * (1ms) cap complements this by handling the signal-only idle path. Together
-     * they keep CPU usage low without over-relying on usleep precision.
-     *
-     * Unix: 10ms is a safe balance between responsiveness and CPU cost.
-     * stream_select() on Unix wakes the moment I/O arrives so this constant
-     * only applies to the HTTP-only path where stream_select cannot be used.
+     * This ensures the loop periodically wakes up to service cURL when stream_select
+     * is otherwise blocking indefinitely. When ONLY HTTP requests are active,
+     * curl_multi_select is used which wakes up exactly on network I/O, meaning
+     * this constant is strictly for the mixed-I/O edge case.
      */
     private const int CURL_POLL_INTERVAL_MICROSECONDS = PHP_OS_FAMILY === 'Windows' ? 20000 : 10_000;
 
@@ -100,9 +82,8 @@ final class WorkHandler implements WorkHandlerInterface
      * 5. I/O Phase — streams, HTTP, file operations
      *    - stream_select timeout is driven by the next timer delay so the loop
      *      wakes up exactly when needed instead of burning cycles on a fixed interval
-     *    - when HTTP is active but no stream watchers exist, usleep(10ms) on Unix
-     *      (or a free-running loop on Windows) replaces stream_select to prevent
-     *      a 100% CPU busy-spin while waiting for responses
+     *    - when HTTP is active, it blocks natively using curl_multi_select
+     *      to avoid a 100% CPU busy-spin while waiting for responses
      * 6. Fiber Phase — drain all ready fibers including ones that become ready
      *    mid-cycle via scheduleFiber() from resolved promises
      * 7. Check Phase — setImmediate() callbacks via queue swap (Node.js semantics)
@@ -249,19 +230,12 @@ final class WorkHandler implements WorkHandlerInterface
      * Three cases handled:
      *
      *   1. Stream watchers exist — stream_select blocks for the calculated
-     *      timeout (timer-aware) and curl is serviced in the same pass.
-     *      stream_select wakes early the moment any stream becomes ready,
-     *      so there is no fixed latency penalty.
+     *      timeout (timer-aware). If cURL requests are also active, the timeout
+     *      is capped to a short interval so curl responses aren't neglected.
      *
-     *   2. HTTP requests active, no stream watchers — stream_select cannot
-     *      be used with empty arrays. On Unix, usleep(CURL_POLL_INTERVAL)
-     *      prevents a 100% CPU busy-spin while waiting for responses,
-     *      clamped to the next timer deadline so timer accuracy is preserved.
-     *      On Windows the sleep is skipped entirely (CURL_POLL_INTERVAL = 0)
-     *      because usleep resolution is 15.6ms by default — SleepHandler's
-     *      1ms Windows cap handles CPU yielding instead.
-     *      The sleep is also skipped when blocking=false or when immediate
-     *      work is already queued.
+     *   2. HTTP requests active, no stream watchers — curl_multi_select is used
+     *      to efficiently block the process until network activity occurs or the
+     *      next timer is due. This drops CPU usage to 0% while waiting for responses.
      *
      *   3. Non-blocking mode — curl is serviced once and returns immediately
      *      regardless of platform.
@@ -278,9 +252,11 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->streamManager->hasWatchers()) {
-            // Case 1: stream_select handles both the sleep and stream I/O.
-            // curl was already serviced above so streams get a full timeout.
             $timeout = $blocking ? $this->calculateStreamTimeout() : 0;
+
+            if ($this->curlRequestManager->hasRequests() && $timeout > self::CURL_POLL_INTERVAL_MICROSECONDS) {
+                $timeout = self::CURL_POLL_INTERVAL_MICROSECONDS;
+            }
 
             if ($this->streamManager->processStreams($timeout)) {
                 $workDone = true;
@@ -290,8 +266,8 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->curlRequestManager->hasRequests() && $blocking) {
-            // Case 2: HTTP in flight, no streams to watch.
-            // Skip the sleep when immediate work is already queued so that
+            // HTTP in flight, no streams to watch.
+            // Skip the block when immediate work is already queued so that
             // ticks, microtasks, fibers, and timers are never delayed by curl.
             $hasImmediateWork = $this->tickHandler->hasTickCallbacks()
                 || $this->tickHandler->hasMicrotaskCallbacks()
@@ -299,13 +275,16 @@ final class WorkHandler implements WorkHandlerInterface
                 || $this->fiberManager->hasReadyFibers();
 
             if (! $hasImmediateWork) {
-                $sleepUs = $this->calculateCurlSleepTimeout();
+                $nextDelay = $this->timerManager->getNextTimerDelay();
 
-                // sleepUs is 0 on Windows (CURL_POLL_INTERVAL_MICROSECONDS = 0)
-                // and also 0 when a timer fires imminently — skip the call
-                // entirely in both cases to avoid the usleep(0) overhead.
-                if ($sleepUs > 0) {
-                    usleep($sleepUs);
+                // Wait up to 1 second if no timers are pending.
+                // curl_multi_select wakes instantly on I/O, preventing high CPU usage.
+                $timeoutSecs = $nextDelay !== null
+                    ? max(0.0, $nextDelay)
+                    : 1.0;
+
+                if ($timeoutSecs > 0) {
+                    $this->curlRequestManager->waitForActivity($timeoutSecs);
                 }
             }
         }
@@ -314,46 +293,15 @@ final class WorkHandler implements WorkHandlerInterface
     }
 
     /**
-     * Calculate how long to sleep between curl polls when HTTP requests are
-     * in flight but no stream watchers exist.
-     *
-     * Clamps to the next timer deadline so the loop wakes up on time even
-     * when a timer fires sooner than the curl poll interval. Matches the
-     * same timer-aware logic used by calculateStreamTimeout().
-     *
-     * Returns 0 on Windows because CURL_POLL_INTERVAL_MICROSECONDS is 0
-     * on that platform — the caller skips usleep() entirely in that case.
-     *
-     * @return int Sleep duration in microseconds (0 = do not sleep)
-     */
-    private function calculateCurlSleepTimeout(): int
-    {
-        $nextDelay = $this->timerManager->getNextTimerDelay();
-
-        if ($nextDelay === null) {
-            // No timers pending — sleep the full curl poll interval.
-            return self::CURL_POLL_INTERVAL_MICROSECONDS;
-        }
-
-        // Convert next timer delay to microseconds and apply the same buffer
-        // factor used by stream_select so the loop wakes slightly before the
-        // timer fires, preventing late execution due to sleep overshoot.
-        $delayUs = (int) ($nextDelay * self::MICROSECONDS_PER_SECOND * self::TIMER_BUFFER_FACTOR);
-
-        // Never sleep longer than the curl poll interval, and never below 0.
-        return max(0, min($delayUs, self::CURL_POLL_INTERVAL_MICROSECONDS));
-    }
-
-    /**
      * Calculate the optimal stream_select timeout in microseconds.
      *
      * Priority:
      *   1. If immediate work is already queued → 0 (poll only, never block)
-     *   2. If a timer is pending → 90% of its delay, clamped to MIN
+     *   2. If a timer is pending → Wait the exact time until the timer fires
      *   3. Otherwise → DEFAULT (200ms as recommended by PHP manual)
      *
-     * This ensures prevent massive CPU usage by blocking stream_select
-     * for longer than necessary when there is immediate work pending.
+     * This ensures we prevent massive CPU usage by blocking stream_select
+     * for exactly the necessary amount of time.
      *
      * @return int Timeout in microseconds
      */
@@ -376,11 +324,8 @@ final class WorkHandler implements WorkHandlerInterface
             // does not introduce latency, only reduces unnecessary wake-ups.
             return self::STREAM_TIMEOUT_DEFAULT_MICROSECONDS;
         }
-
-        // Convert next timer delay to microseconds and apply buffer factor
-        // so stream_select wakes up slightly before the timer fires,
-        // preventing late execution due to I/O blocking.
-        $delayUs = (int) ($nextDelay * self::MICROSECONDS_PER_SECOND * self::TIMER_BUFFER_FACTOR);
+        
+        $delayUs = (int) ($nextDelay * self::MICROSECONDS_PER_SECOND);
 
         return max($delayUs, self::STREAM_TIMEOUT_MIN_MICROSECONDS);
     }

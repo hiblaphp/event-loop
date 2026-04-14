@@ -47,4 +47,12 @@ interface CurlRequestManagerInterface
      * @return array{pending: int, active: int} Count of cleared requests
      */
     public function clearAllRequests(): array;
+
+    /**
+     * Waits for activity on any of the active HTTP requests.
+     *
+     * @param  float  $timeout  Timeout in seconds
+     * @return int Number of active descriptors, or -1 on failure
+     */
+    public function waitForActivity(float $timeout): int;
 }

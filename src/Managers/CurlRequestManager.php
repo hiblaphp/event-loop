@@ -147,6 +147,26 @@ final class CurlRequestManager implements CurlRequestManagerInterface
     /**
      * @inheritDoc
      */
+    public function waitForActivity(float $timeout): int
+    {
+        if (\count($this->activeRequests) === 0) {
+            return 0;
+        }
+
+        $active = curl_multi_select($this->multiHandle, $timeout);
+
+        if ($active === -1) {
+            // A return value of -1 means a select error occurred.
+            // Sleep briefly to prevent a tight CPU loop.
+            usleep(100);
+        }
+
+        return $active;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function hasRequests(): bool
     {
         return \count($this->pendingRequests) > 0 || \count($this->activeRequests) > 0;

@@ -12,15 +12,9 @@ use Hibla\EventLoop\Interfaces\TimerManagerInterface;
 
 final class SleepHandler implements SleepHandlerInterface
 {
-    private const int WINDOWS_MAX_SLEEP_NS = 1_000_000;
-    private const int UNIX_MAX_SLEEP_NS = 10_000_000;
-    private const int MAX_SLEEP_RETRIES = 10;
-    private const bool IS_WINDOWS = PHP_OS_FAMILY === 'Windows';
-
     public function __construct(
         private TimerManagerInterface $timerManager,
         private FiberManagerInterface $fiberManager,
-        // @phpstan-ignore-next-line
         private CurlRequestManagerInterface $curlRequestManager,
         private StreamManagerInterface $streamManager,
     ) {
@@ -36,11 +30,11 @@ final class SleepHandler implements SleepHandlerInterface
             return false;
         }
 
-        // HTTP requests alone do NOT prevent sleeping — WorkHandler services
-        // curl on a usleep interval (Unix) or relies on this handler's 1ms
-        // Windows cap (Windows), so the sleep path must remain available to
-        // avoid a busy-spin when only HTTP work is pending.
         if ($this->streamManager->hasWatchers()) {
+            return false;
+        }
+
+        if ($this->curlRequestManager->hasRequests()) {
             return false;
         }
 
@@ -54,20 +48,19 @@ final class SleepHandler implements SleepHandlerInterface
     public function calculateOptimalSleep(): int
     {
         $nextTimerDelay = $this->timerManager->getNextTimerDelay();
-        $maxSleepNs = self::IS_WINDOWS ? self::WINDOWS_MAX_SLEEP_NS : self::UNIX_MAX_SLEEP_NS;
 
         if ($nextTimerDelay === null) {
-            return $maxSleepNs;
+            // No timers pending. Sleep for 1 second.
+            // Waking up once per second keeps CPU usage at 0.00% while
+            // periodically polling just in case of edge-case state changes.
+            return 1_000_000_000;
         }
 
         $delayNs = (int) ($nextTimerDelay * 1_000_000_000);
 
-        $bufferDelayNs = (int) ($delayNs * 0.9);
-
-        return min(
-            max($bufferDelayNs, 100_000),
-            $maxSleepNs
-        );
+        // Sleep exactly until the timer fires, clamped at 100 microseconds
+        // minimum to prevent a busy-spin if a timer is somehow 0.00001s away.
+        return max($delayNs, 100_000);
     }
 
     public function sleep(int $nanoseconds): void
@@ -76,28 +69,13 @@ final class SleepHandler implements SleepHandlerInterface
             return;
         }
 
-        $remaining = $nanoseconds;
-        $retries = 0;
+        $seconds = intdiv($nanoseconds, 1_000_000_000);
+        $remainingNs = $nanoseconds % 1_000_000_000;
 
-        while ($remaining > 0 && $retries < self::MAX_SLEEP_RETRIES) {
-            $seconds = intdiv($remaining, 1_000_000_000);
-            $remainingNs = $remaining % 1_000_000_000;
-
-            $result = time_nanosleep($seconds, $remainingNs);
-
-            if ($result === true) {
-                return;
-            }
-
-            // Just in case, if time_nanosleep returns an array, we update the remaining time
-            if (\is_array($result)) {
-                $remaining = $result['seconds'] * 1_000_000_000 + $result['nanoseconds'];
-                $retries++;
-
-                continue;
-            }
-
-            return;
-        }
+        // Sleep using time_nanosleep.
+        // If it is interrupted by an OS signal, it returns an array.
+        //  Intentionally do NOT retry here. Returning immediately allows the
+        // event loop to tick and process the pending signal natively.
+        @time_nanosleep($seconds, $remainingNs);
     }
 }
