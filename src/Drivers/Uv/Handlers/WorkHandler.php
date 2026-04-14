@@ -16,6 +16,28 @@ final class WorkHandler implements WorkHandlerInterface
 {
     private \UVLoop $uvLoop;
 
+    private \UVTimer $curlTimer;
+
+    /**
+     * Tracks whether the curl service timer is currently armed.
+     * Used instead of uv_is_active() which is not reliable across
+     * all ext-uv builds.
+     */
+    private bool $curlTimerActive = false;
+
+    /**
+     * How often (in milliseconds) the curl service timer fires while
+     * HTTP requests are in flight.
+     *
+     * 10ms is a balance between responsiveness and CPU cost:
+     * - Low enough that responses are noticed quickly
+     * - High enough that libuv genuinely sleeps between ticks via RUN_ONCE
+     *
+     * libuv will also wake earlier than this if any other watcher fires
+     * (app timers, signals, streams) so this is a ceiling, not a fixed cost.
+     */
+    private const int CURL_TIMER_INTERVAL_MS = 10;
+
     public function __construct(
         \UVLoop $uvLoop,
         private UvTimerManagerInterface $timerManager,
@@ -26,6 +48,7 @@ final class WorkHandler implements WorkHandlerInterface
         private SignalManagerInterface $signalManager,
     ) {
         $this->uvLoop = $uvLoop;
+        $this->curlTimer = uv_timer_init($this->uvLoop);
     }
 
     public function hasWork(): bool
@@ -56,27 +79,26 @@ final class WorkHandler implements WorkHandlerInterface
      *   are drained after every callback in the timers queue."
      *
      * HTTP/curl phase works as follows:
-     *   While requests are in flight, $hasImmediateWork is set to true, which
-     *   forces RUN_NOWAIT so the event loop never blocks while curl needs
-     *   servicing. curl_multi_exec() is called directly after uv_run() to
-     *   drain any completions that landed during the iteration.
-     *   NOTE: This trades the idle-sleep benefit of a dedicated curl service
-     *   timer for simplicity — when HTTP requests are in flight the loop will
-     *   busy-spin rather than sleeping between ticks.
+     *   A dedicated repeating uv_timer fires every CURL_TIMER_INTERVAL_MS
+     *   while requests are in flight. This means libuv can genuinely sleep
+     *   via RUN_ONCE between ticks — curl is serviced by the timer waking
+     *   libuv, not by forcing RUN_NOWAIT on every iteration.
+     *   The timer is armed only when requests are active and disarmed the
+     *   moment the last request completes, so there is zero overhead at idle.
      *
      * 1. Pre-loop: drain nextTick & microtasks before doing anything else
-     * 2. Admit any newly queued HTTP requests into the curl multi handle
-     * 3. Determine UV run mode — NOWAIT when PHP-land work (or active curl
-     *    requests) is already queued, RUN_ONCE to block until the next I/O
-     *    or timer event otherwise
+     * 2. Admit any newly queued HTTP requests into the curl multi handle,
+     *    and arm the curl service timer if not already running
+     * 3. Determine UV run mode — NOWAIT when PHP-land work is already queued,
+     *    RUN_ONCE to block until the next I/O or timer event otherwise
      * 4. Run libuv — wakes up when a timer fires or I/O is ready;
      *    stream and signal callbacks execute inside this call;
      *    timer master callback is intentionally a no-op, timers are pulled below
      * 5. Timer phase — collect ready callbacks and execute one at a time,
      *    draining nextTick + microtasks after each (Node.js timer phase semantics);
      *    reschedule master timer after consuming ready ones
-     * 6. HTTP (cURL) phase — service curl after uv_run to catch completions
-     *    that landed during this iteration
+     * 6. HTTP (cURL) phase — service curl after uv_run in case the curl
+     *    service timer fired during this iteration
      * 7. Fiber phase — drain all ready fibers, draining ticks between each
      * 8. Check phase — setImmediate callbacks via queue swap (Node.js semantics)
      * 9. Close callbacks phase — deferred callbacks, only when all other work done
@@ -95,13 +117,14 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        // Active curl requests force RUN_NOWAIT so the loop never blocks while
-        // curl needs servicing. Without a dedicated curl service timer, this is
-        // the mechanism that ensures curl_multi_exec() is called frequently
-        // enough to notice completed transfers.
+        // Arm the curl service timer while requests are in flight.
+        // The timer fires every CURL_TIMER_INTERVAL_MS, calling curl_multi_exec
+        // which is non-blocking. This wakes libuv on schedule so RUN_ONCE can
+        // sleep instead of busy-spinning via RUN_NOWAIT.
+        $this->syncCurlTimer();
+
         $hasImmediateWork = $this->tickHandler->hasImmediateCallbacks()
-            || $this->fiberManager->hasReadyFibers()
-            || $this->curlRequestManager->hasRequests();
+            || $this->fiberManager->hasReadyFibers();
 
         $flags = (! $blocking || $hasImmediateWork) ? \UV::RUN_NOWAIT : \UV::RUN_ONCE;
 
@@ -121,11 +144,17 @@ final class WorkHandler implements WorkHandlerInterface
             $workDone = true;
         }
 
-        // Curl phase — service any completions that landed during uv_run,
-        // draining ticks immediately after to keep phase ordering correct.
-        if ($this->curlRequestManager->processRequests()) {
-            $workDone = true;
-            $this->processTicksAndMicrotasks();
+        // The curl service timer fires inside uv_run, but processRequests()
+        // here catches completions that landed in this same tick and drains
+        // ticks immediately after, keeping phase ordering correct.
+        if ($this->curlRequestManager->hasRequests()) {
+            if ($this->curlRequestManager->processRequests()) {
+                $workDone = true;
+                $this->processTicksAndMicrotasks();
+            }
+
+            // Re-sync the timer now that requests may have completed.
+            $this->syncCurlTimer();
         }
 
         while ($this->fiberManager->hasReadyFibers()) {
@@ -157,6 +186,50 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         return $workDone;
+    }
+
+    /**
+     * Arm or disarm the curl service timer based on whether HTTP requests
+     * are currently active.
+     *
+     * - Active requests   → start the timer if not already running
+     * - No active requests → stop the timer to eliminate idle overhead
+     *
+     * The timer calls processRequests() on each tick, which internally calls
+     * curl_multi_exec() — a non-blocking call that returns immediately if
+     * nothing has happened. The repeat interval ensures libuv wakes from
+     * RUN_ONCE at most every CURL_TIMER_INTERVAL_MS while HTTP is in flight,
+     * giving curl regular opportunities to notice completed transfers without
+     * the event loop busy-spinning.
+     */
+    private function syncCurlTimer(): void
+    {
+        $hasRequests = $this->curlRequestManager->hasRequests();
+
+        if ($hasRequests && ! $this->curlTimerActive) {
+            uv_timer_start(
+                $this->curlTimer,
+                self::CURL_TIMER_INTERVAL_MS,
+                self::CURL_TIMER_INTERVAL_MS,
+                function (): void {
+                    $this->curlRequestManager->processRequests();
+
+                    if (! $this->curlRequestManager->hasRequests()) {
+                        uv_timer_stop($this->curlTimer);
+                        $this->curlTimerActive = false;
+                    }
+                },
+            );
+
+            $this->curlTimerActive = true;
+
+            return;
+        }
+
+        if (! $hasRequests && $this->curlTimerActive) {
+            uv_timer_stop($this->curlTimer);
+            $this->curlTimerActive = false;
+        }
     }
 
     /**

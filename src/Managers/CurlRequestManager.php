@@ -207,14 +207,7 @@ final class CurlRequestManager implements CurlRequestManagerInterface
     {
         $running = null;
 
-        do {
-            curl_multi_exec($this->multiHandle, $running);
-
-            if ($running > 0 && curl_multi_select($this->multiHandle) === -1) {
-                time_nanosleep(0, 1_000_000);
-            }
-
-        } while ($running > 0);
+        curl_multi_exec($this->multiHandle, $running);
 
         if (! \is_int($running)) {
             throw new RuntimeException('curl_multi_exec failed to update the handle count to an integer.');

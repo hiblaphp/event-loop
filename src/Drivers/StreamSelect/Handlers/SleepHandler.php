@@ -20,6 +20,7 @@ final class SleepHandler implements SleepHandlerInterface
     public function __construct(
         private TimerManagerInterface $timerManager,
         private FiberManagerInterface $fiberManager,
+        // @phpstan-ignore-next-line
         private CurlRequestManagerInterface $curlRequestManager,
         private StreamManagerInterface $streamManager,
     ) {
@@ -35,10 +36,10 @@ final class SleepHandler implements SleepHandlerInterface
             return false;
         }
 
-        if ($this->curlRequestManager->hasRequests()) {
-            return false;
-        }
-
+        // HTTP requests alone do NOT prevent sleeping — WorkHandler services
+        // curl on a usleep interval (Unix) or relies on this handler's 1ms
+        // Windows cap (Windows), so the sleep path must remain available to
+        // avoid a busy-spin when only HTTP work is pending.
         if ($this->streamManager->hasWatchers()) {
             return false;
         }
@@ -88,7 +89,7 @@ final class SleepHandler implements SleepHandlerInterface
                 return;
             }
 
-            // Just in case, if time_nanosleep returns an array, update the remaining time
+            // Just in case, if time_nanosleep returns an array, we update the remaining time
             if (\is_array($result)) {
                 $remaining = $result['seconds'] * 1_000_000_000 + $result['nanoseconds'];
                 $retries++;
