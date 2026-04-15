@@ -55,7 +55,8 @@ final class EventLoopComponentFactory
                 );
             }
 
-            return \uv_loop_new();
+            // use default uv loop instead of creating a new one via uv_loop_new() as it causes seg fault when the loop is reset and forcibly stop and gc
+            return \uv_default_loop();
         }
 
         return null;
