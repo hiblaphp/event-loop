@@ -242,7 +242,10 @@ final class StreamManager implements StreamManagerInterface
             return ['read' => [], 'write' => []];
         }
 
-        @stream_select($read, $write, $except, 0, $timeoutMicroseconds);
+        $seconds = intdiv($timeoutMicroseconds, 1_000_000);
+        $microseconds = $timeoutMicroseconds % 1_000_000;
+
+        @stream_select($read, $write, $except, $seconds, $microseconds);
 
         return [
             'read' => \count($read) > 0 ? $read : [],

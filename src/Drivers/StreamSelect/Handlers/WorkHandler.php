@@ -28,17 +28,22 @@ final class WorkHandler implements WorkHandlerInterface
 
     /**
      * Used when no timers are pending and there is no immediate work.
-     * The PHP manual recommends at least 200,000μs (200ms) for CPU efficiency.
-     * stream_select() will still return early the moment I/O arrives.
-     *
-     * @see https://www.php.net/manual/en/function.stream-select.php
+     * Set to 1 second (1,000,000μs) to maximize CPU efficiency during idle periods.
+     * stream_select() will still return instantly the moment network I/O arrives.
      */
-    private const int STREAM_TIMEOUT_DEFAULT_MICROSECONDS = 200_000;
+    private const int STREAM_TIMEOUT_DEFAULT_MICROSECONDS = 1_000_000;
 
     /**
      * Microseconds per second — used to convert timer delays to microseconds.
      */
     private const int MICROSECONDS_PER_SECOND = 1_000_000;
+
+    /**
+     * Buffer factor applied to the next timer delay before passing it to
+     * stream_select or curl_multi_select. Wakes up slightly before the timer 
+     * fires to account for OS scheduling jitter and prevent oversleeping.
+     */
+    private const float TIMER_BUFFER_FACTOR = 0.9;
 
     /**
      * Maximum time to block in stream_select (in microseconds) when both stream
@@ -49,7 +54,7 @@ final class WorkHandler implements WorkHandlerInterface
      * curl_multi_select is used which wakes up exactly on network I/O, meaning
      * this constant is strictly for the mixed-I/O edge case.
      */
-    private const int CURL_POLL_INTERVAL_MICROSECONDS = PHP_OS_FAMILY === 'Windows' ? 20000 : 10_000;
+    private const int CURL_POLL_INTERVAL_MICROSECONDS = PHP_OS_FAMILY === 'Windows' ? 20_000 : 10_000;
 
     public function __construct(
         private TimerManagerInterface $timerManager,
@@ -58,8 +63,7 @@ final class WorkHandler implements WorkHandlerInterface
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
         private SignalManagerInterface $signalManager,
-    ) {
-    }
+    ) {}
 
     public function hasWork(): bool
     {
@@ -266,9 +270,6 @@ final class WorkHandler implements WorkHandlerInterface
         }
 
         if ($this->curlRequestManager->hasRequests() && $blocking) {
-            // HTTP in flight, no streams to watch.
-            // Skip the block when immediate work is already queued so that
-            // ticks, microtasks, fibers, and timers are never delayed by curl.
             $hasImmediateWork = $this->tickHandler->hasTickCallbacks()
                 || $this->tickHandler->hasMicrotaskCallbacks()
                 || $this->tickHandler->hasImmediateCallbacks()
@@ -277,11 +278,8 @@ final class WorkHandler implements WorkHandlerInterface
             if (! $hasImmediateWork) {
                 $nextDelay = $this->timerManager->getNextTimerDelay();
 
-                // Wait up to 1 second if no timers are pending.
-                // curl_multi_select wakes instantly on I/O, preventing high CPU usage.
-                $timeoutSecs = $nextDelay !== null
-                    ? max(0.0, $nextDelay)
-                    : 1.0;
+                // Keep CPU near 0% while polling cURL internally
+                $timeoutSecs = $nextDelay !== null ? max(0.0, $nextDelay * self::TIMER_BUFFER_FACTOR) : 1.0;
 
                 if ($timeoutSecs > 0) {
                     $this->curlRequestManager->waitForActivity($timeoutSecs);
@@ -297,7 +295,7 @@ final class WorkHandler implements WorkHandlerInterface
      *
      * Priority:
      *   1. If immediate work is already queued → 0 (poll only, never block)
-     *   2. If a timer is pending → Wait the exact time until the timer fires
+     *   2. If a timer is pending → 90% of its delay, clamped to MIN
      *   3. Otherwise → DEFAULT (200ms as recommended by PHP manual)
      *
      * This ensures we prevent massive CPU usage by blocking stream_select
@@ -324,8 +322,8 @@ final class WorkHandler implements WorkHandlerInterface
             // does not introduce latency, only reduces unnecessary wake-ups.
             return self::STREAM_TIMEOUT_DEFAULT_MICROSECONDS;
         }
-        
-        $delayUs = (int) ($nextDelay * self::MICROSECONDS_PER_SECOND);
+
+        $delayUs = (int) ($nextDelay * self::MICROSECONDS_PER_SECOND * self::TIMER_BUFFER_FACTOR);
 
         return max($delayUs, self::STREAM_TIMEOUT_MIN_MICROSECONDS);
     }
