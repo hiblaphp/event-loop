@@ -416,6 +416,10 @@ final class EventLoopFactory implements LoopInterface
      */
     public static function reset(): void
     {
+        if (self::$instance !== null) {
+            self::$instance->forceShutdown();
+        }
+        
         self::$instance = null;
         self::$autoRunRegistered = false;
         self::$explicitlyStopped = false;
