@@ -21,6 +21,7 @@ foundation for other async ecosystems.
 - [Installation](#installation)
 - [Introduction](#introduction)
 - [Zero Boilerplate: Auto-Run](#zero-boilerplate-auto-run)
+  - [Disabling Auto-Run](#disabling-auto-run)   ← add this
 - [How the Loop Works](#how-the-loop-works)
 
 **Task scheduling**
@@ -85,7 +86,7 @@ composer require hiblaphp/event-loop:"^1.0@alpha"
 - PHP 8.4+
 - `ext-curl` (required only if you use `Loop::addCurlRequest()`; a
   `RuntimeException` is thrown at runtime if curl is not loaded)
-- `ext-pcntl` (Unix/macOS only, required for signal handling)
+- `ext-pcntl` (Unix/macOS only, required for signal handling for stream-select driver)
 - `ext-uv` (optional; enables the UV driver for better performance)
 
 ---
@@ -176,6 +177,82 @@ try {
     logger()->error($e->getMessage());
 }
 ```
+
+### Disabling Auto-Run
+
+Auto-run is enabled by default and covers the vast majority of use cases. There
+are situations, however, where you want to take full, explicit control over when
+and how the loop executes:
+
+- **You are integrating with another event loop.** Frameworks such as Swoole,
+  ReactPHP, or AMPHP/Revolt ship their own loop runners. Letting two loops both
+  auto-fire at shutdown is a recipe for double-execution, unpredictable ordering,
+  and subtle callback conflicts. Disabling auto-run lets you hand off execution
+  to whichever loop owns the process.
+
+- **You need deterministic execution order in tests.** Auto-run fires at
+  shutdown, which is outside the normal test lifecycle. Disabling it and calling
+  `Loop::run()` explicitly makes the loop execute exactly when you expect,
+  inside your test assertions, not after them.
+
+- **You are building a framework or library on top of the loop.** A higher-level
+  abstraction (an HTTP server, a task runner, a job queue) typically wants to own
+  the loop lifecycle itself. Consuming code should not be able to accidentally
+  trigger execution by simply not calling `run()`.
+
+- **You want a fire-and-forget bootstrap phase.** You may want to schedule work
+  during bootstrap, then start the loop at a precise point later in the script —
+  after configuration is loaded, connections are established, or other setup is
+  complete.
+
+```php
+Loop::disableAutoRun();
+```
+
+Once disabled, the shutdown hook is still registered (it has to be, since PHP
+does not allow unregistering shutdown functions), but it becomes a no-op. The
+loop will only execute when you call `Loop::run()` or `Loop::runOnce()` yourself:
+
+```php
+Loop::disableAutoRun();
+
+Loop::addTimer(1.0, function () {
+    echo "Fired\n";
+});
+
+// Script would end here with no output — auto-run is off and run() was never called
+```
+
+```php
+Loop::disableAutoRun();
+
+Loop::addTimer(1.0, function () {
+    echo "Fired\n";
+});
+
+Loop::run(); // You decide exactly when execution happens
+// Output: Fired
+```
+
+Auto-run can be re-enabled at any point before the shutdown hook fires:
+
+```php
+Loop::disableAutoRun();
+
+// ... setup, configuration, bootstrapping ...
+
+Loop::enableAutoRun(); // hand execution back to the shutdown hook
+```
+
+> **Call `disableAutoRun()` early.** The shutdown hook checks the flag at the
+> moment it fires, not at the moment the function was registered. You can safely
+> call `disableAutoRun()` anywhere before the script ends — even after scheduling
+> work. However, calling it after `Loop::run()` has already returned has no
+> practical effect since the work has already been processed.
+
+> **Testing:** `Loop::reset()` restores auto-run to its default enabled state,
+> so tests that call `reset()` in `tearDown()` start each test with a clean slate
+> and do not need to manually re-enable it.
 
 ---
 
@@ -1050,6 +1127,7 @@ fibers while each `await()` is suspended.
 ---
 
 ## Controlling the Loop
+
 ```php
 // Block until all work is exhausted or stop() is called
 Loop::run();
@@ -1064,6 +1142,18 @@ Loop::stop();
 
 // Immediate stop: clears all queues and exits now, no cleanup
 Loop::forceStop();
+
+// Disable the shutdown auto-run hook (enabled by default).
+// The loop will only execute when you call run() or runOnce() explicitly.
+Loop::disableAutoRun();
+
+// Re-enable the shutdown auto-run hook.
+Loop::enableAutoRun();
+
+// Tears down the singleton, clears all registered work, and resets all
+// internal flags (including auto-run) to their defaults. Primarily for
+// test isolation — always call forceStop() first if real I/O is in flight.
+Loop::reset();
 
 // Introspection
 Loop::isRunning(); // true while the loop is actively iterating

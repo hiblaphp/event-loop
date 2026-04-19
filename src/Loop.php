@@ -321,6 +321,23 @@ final class Loop
     }
 
     /**
+     * Disable the shutdown auto-run.
+     * After calling this, the loop will only execute if you call Loop::run() yourself.
+     */
+    public static function disableAutoRun(): void
+    {
+        EventLoopFactory::disableAutoRun();
+    }
+
+    /**
+     * Re-enable the shutdown auto-run (it is enabled by default).
+     */
+    public static function enableAutoRun(): void
+    {
+        EventLoopFactory::enableAutoRun();
+    }
+
+    /**
      * Resets the singleton instance. Primarily for testing purposes.
      */
     public static function reset(): void

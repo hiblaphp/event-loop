@@ -40,7 +40,7 @@ final class WorkHandler implements WorkHandlerInterface
 
     /**
      * Buffer factor applied to the next timer delay before passing it to
-     * stream_select or curl_multi_select. Wakes up slightly before the timer 
+     * stream_select or curl_multi_select. Wakes up slightly before the timer
      * fires to account for OS scheduling jitter and prevent oversleeping.
      */
     private const float TIMER_BUFFER_FACTOR = 0.9;
@@ -63,7 +63,8 @@ final class WorkHandler implements WorkHandlerInterface
         private FiberManagerInterface $fiberManager,
         private TickHandler $tickHandler,
         private SignalManagerInterface $signalManager,
-    ) {}
+    ) {
+    }
 
     public function hasWork(): bool
     {

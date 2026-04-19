@@ -49,9 +49,11 @@ final class EventLoopFactory implements LoopInterface
      */
     private mixed $loopResource;
 
-    private bool $hasStarted = false;
     private static bool $autoRunRegistered = false;
+
     private static bool $explicitlyStopped = false;
+
+    private static bool $autoRunEnabled = true;
 
     private function __construct()
     {
@@ -320,6 +322,23 @@ final class EventLoopFactory implements LoopInterface
     }
 
     /**
+     * Disable the auto-run behaviour that normally fires at script shutdown.
+     * Call this before any async work is scheduled if you want full manual control.
+     */
+    public static function disableAutoRun(): void
+    {
+        self::$autoRunEnabled = false;
+    }
+
+    /**
+     * Re-enable auto-run (it is enabled by default).
+     */
+    public static function enableAutoRun(): void
+    {
+        self::$autoRunEnabled = true;
+    }
+
+    /**
      * Handle graceful shutdown with fallback to forced shutdown.
      */
     private function handleGracefulShutdown(): void
@@ -385,7 +404,7 @@ final class EventLoopFactory implements LoopInterface
                 return;
             }
 
-            if (! self::$explicitlyStopped && ! $this->hasStarted && $this->workHandler->hasWork()) {
+            if (self::$autoRunEnabled && ! self::$explicitlyStopped && $this->workHandler->hasWork()) {
                 $this->run();
             }
         });
@@ -419,9 +438,10 @@ final class EventLoopFactory implements LoopInterface
         if (self::$instance !== null) {
             self::$instance->forceShutdown();
         }
-        
+
         self::$instance = null;
         self::$autoRunRegistered = false;
         self::$explicitlyStopped = false;
+        self::$autoRunEnabled = true;
     }
 }
