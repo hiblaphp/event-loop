@@ -87,7 +87,7 @@ allows beta releases:
 ```
 
 ```bash
-composer require hiblaphp/mysql
+composer require hiblaphp/event-loop
 ```
 
 **Requirements:**
