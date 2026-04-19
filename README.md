@@ -21,7 +21,7 @@ foundation for other async ecosystems.
 - [Installation](#installation)
 - [Introduction](#introduction)
 - [Zero Boilerplate: Auto-Run](#zero-boilerplate-auto-run)
-  - [Disabling Auto-Run](#disabling-auto-run)   ← add this
+  - [Disabling Auto-Run](#disabling-auto-run)  
 - [How the Loop Works](#how-the-loop-works)
 
 **Task scheduling**
