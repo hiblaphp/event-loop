@@ -97,7 +97,7 @@ final class StreamManager implements StreamManagerInterface
             return false;
         }
 
-        $meta = $this->watcherIndex[$watcherId];
+        $meta     = $this->watcherIndex[$watcherId];
         $streamId = $meta['streamId'];
 
         if ($meta['type'] === StreamWatcher::TYPE_READ) {
@@ -122,7 +122,7 @@ final class StreamManager implements StreamManagerInterface
      */
     private function addStreamWatcher($stream, callable $callback, string $type = StreamWatcher::TYPE_READ): string
     {
-        $watcher = new StreamWatcher($stream, $callback, $type);
+        $watcher  = new StreamWatcher($stream, $callback, $type);
         $streamId = (int) $stream;
         $watcherId = $watcher->getId();
 
@@ -133,7 +133,7 @@ final class StreamManager implements StreamManagerInterface
         }
 
         $this->watcherIndex[$watcherId] = [
-            'type' => $type,
+            'type'     => $type,
             'streamId' => $streamId,
         ];
 
@@ -199,12 +199,27 @@ final class StreamManager implements StreamManagerInterface
      */
     public function clearAllWatchers(): void
     {
-        $this->readWatchers = [];
+        $this->readWatchers  = [];
         $this->writeWatchers = [];
-        $this->watcherIndex = [];
+        $this->watcherIndex  = [];
     }
 
     /**
+     * Calls stream_select() on the given read and write watcher sets, returning
+     * the streams that are ready for I/O.
+     *
+     * On Windows, failed outbound connection attempts are not reported through
+     * the write set like they are on POSIX platforms. Instead they surface via
+     * the exceptional-conditions set ($except). To keep the public API uniform
+     * across platforms, write-only sockets that appear to be in a pending
+     * connection state (position 0, not already in the read set) are added to
+     * $except automatically and merged back into the write result afterwards,
+     * so existing write callbacks receive and handle the error naturally.
+     *
+     * EINTR warnings emitted when a signal interrupts the syscall are suppressed
+     * via a scoped error handler; all other PHP warnings are forwarded to
+     * whichever error handler the application has registered.
+     *
      * @param  array<int, array<string, StreamWatcher>>  $readWatchers
      * @param  array<int, array<string, StreamWatcher>>  $writeWatchers
      * @return array{read: array<resource>, write: array<resource>}
@@ -214,16 +229,15 @@ final class StreamManager implements StreamManagerInterface
         array $writeWatchers,
         int $timeoutMicroseconds = self::DEFAULT_TIMEOUT_MICROSECONDS,
     ): array {
-        $read = [];
+        $read  = [];
         $write = [];
-        $except = null;
 
         foreach ($readWatchers as $watchers) {
             $watcher = reset($watchers);
             if ($watcher !== false) {
                 $stream = $watcher->getStream();
                 if (\is_resource($stream)) {
-                    $read[] = $stream;
+                    $read[(int) $stream] = $stream;
                 }
             }
         }
@@ -233,7 +247,7 @@ final class StreamManager implements StreamManagerInterface
             if ($watcher !== false) {
                 $stream = $watcher->getStream();
                 if (\is_resource($stream)) {
-                    $write[] = $stream;
+                    $write[(int) $stream] = $stream;
                 }
             }
         }
@@ -242,14 +256,57 @@ final class StreamManager implements StreamManagerInterface
             return ['read' => [], 'write' => []];
         }
 
-        $seconds = intdiv($timeoutMicroseconds, 1_000_000);
+        // Windows does not report failed outbound connection attempts through
+        // writefds like POSIX platforms do. Instead it uses exceptfds instead.
+        // It approximate pending-connect sockets as write-only sockets at
+        // stream position 0 and add them to $except so they are not silently
+        // dropped. After stream_select() they are merged back into $write so
+        // the rest of the dispatch loop requires no platform-specific branches.
+        // @link https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select
+        $except = null;
+        if (\PHP_OS_FAMILY === 'Windows') {
+            $except = [];
+            foreach ($write as $key => $socket) {
+                if (! isset($read[$key]) && @\ftell($socket) === 0) {
+                    $except[$key] = $socket;
+                }
+            }
+        }
+
+        $seconds      = intdiv($timeoutMicroseconds, 1_000_000);
         $microseconds = $timeoutMicroseconds % 1_000_000;
 
-        @stream_select($read, $write, $except, $seconds, $microseconds);
+        // Use a scoped error handler rather than @ suppression so that only
+        // EINTR interruption warnings are silenced. Any other warning is
+        // forwarded to the application's registered error handler as normal.
+        $previous = \set_error_handler(function ($errno, $errstr) use (&$previous) {
+            $eintr = \defined('SOCKET_EINTR') ? \SOCKET_EINTR : (\defined('PCNTL_EINTR') ? \PCNTL_EINTR : 4);
+            if ($errno === \E_WARNING && \str_contains($errstr, '[' . $eintr . ']: ')) {
+                return;
+            }
+
+            return $previous !== null ? ($previous)($errno, $errstr) : false;
+        });
+
+        try {
+            $result = \stream_select($read, $write, $except, $seconds, $microseconds);
+            \restore_error_handler();
+        } catch (\Throwable $e) {
+            \restore_error_handler();
+            throw $e;
+        }
+
+        if ($result === false) {
+            return ['read' => [], 'write' => []];
+        }
+
+        if ($except) {
+            $write = [...$write, ...$except];
+        }
 
         return [
-            'read' => \count($read) > 0 ? $read : [],
-            'write' => \count($write) > 0 ? $write : [],
+            'read'  => $read,
+            'write' => $write,
         ];
     }
 }
