@@ -279,14 +279,20 @@ final class StreamManager implements StreamManagerInterface
         // Use a scoped error handler rather than @ suppression so that only
         // EINTR interruption warnings are silenced. Any other warning is
         // forwarded to the application's registered error handler as normal.
-        $previous = \set_error_handler(function ($errno, $errstr) use (&$previous) {
-            $eintr = \defined('SOCKET_EINTR') ? \SOCKET_EINTR : (\defined('PCNTL_EINTR') ? \PCNTL_EINTR : 4);
-            if ($errno === \E_WARNING && \str_contains($errstr, '[' . $eintr . ']: ')) {
-                return;
-            }
+        $previous = \set_error_handler(
+            function (int $errno, string $errstr, string $errfile = '', int $errline = 0) use (&$previous): bool {
+                $eintr = \defined('SOCKET_EINTR') ? \SOCKET_EINTR : (\defined('PCNTL_EINTR') ? \PCNTL_EINTR : 4);
+                if ($errno === \E_WARNING && \str_contains($errstr, '[' . $eintr . ']: ')) {
+                    return true;
+                }
 
-            return $previous !== null ? ($previous)($errno, $errstr) : false;
-        });
+                if ($previous !== null) {
+                    return (bool) ($previous)($errno, $errstr, $errfile, $errline);
+                }
+
+                return false;
+            }
+        );
 
         try {
             $result = \stream_select($read, $write, $except, $seconds, $microseconds);
@@ -300,7 +306,7 @@ final class StreamManager implements StreamManagerInterface
             return ['read' => [], 'write' => []];
         }
 
-        if ($except) {
+        if ($except !== null && \count($except) > 0) {
             $write = [...$write, ...$except];
         }
 
